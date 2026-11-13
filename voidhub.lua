@@ -1,6 +1,7 @@
 --[[
-    DXLTA / Void Hub  v5.7c
+    DXLTA / Void Hub  v5.7d
     Renamed from secrethub.lua — live copy for script777777/Blox-Fruits-
+    5.7d: dodge-only by default · distance keep (Stalker/Puppet/Auto-protect) opt-in
     5.7c: crash-safe boot (no game.__index / no eager namecall)
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/cursor/voidhub-live-ff0d/voidhub.lua"))()
@@ -40,7 +41,7 @@ ENV.__VoidHub = {}
 ENV.__SecretHub = ENV.__VoidHub -- legacy alias for older unloaders
 local HUB = ENV.__VoidHub
 HUB.tier = nil -- "free" | "premium" | nil (choose on Start)
-HUB.version = "5.7c"
+HUB.version = "5.7d"
 HUB.session = {dodges = 0, saves = 0, kills = 0, learned = 0, blocks = 0, started = os.clock()}
 
 -- =====================================================================
@@ -465,16 +466,16 @@ GV.DEFAULTS = {
     autorejoin = false, freecam = false, timeOverride = false, gravityOverride = false,
     staffAction = "Notify", panicSafeSpot = true, accent = 5, particles = true, sounds = true,
     uiscale = 100, confirmRun = true, autoProfile = false, closeAfterRun = true,
-    brainOn = true, brainLimit = true, autoProtect = true, threatEsp = true, hazardShield = false, autoHeal = false,
+    brainOn = true, brainLimit = true, autoProtect = false, threatEsp = true, hazardShield = false, autoHeal = false,
     aggression = false, aggroNpc = true, aggroPvp = false, aggroOneShot = true, aggroSkills = true, aggroCombo = true,
     aggroLock = true, aggroRange = 20, aggroRate = 4,
-    godmode = false, autododge = false, antigrab = false, antifreeze = false, radar = false, vfx = true,
+    godmode = false, autododge = true, antigrab = false, antifreeze = false, radar = false, vfx = true,
     fxAura = false, fxAwaken = true, fxSixth = true, fxHeartbeat = true, fxBolt = true, fxHex = true, fxDomain = true,
     fxGodForm = true, voice = true, voiceTyping = false, voiceTaunts = true, voiceChat = true,
     npcdef = false, ghost = false, magnet = false, magnetRadius = 25,
     handsOn = true, handsPuppet = false, handsRescue = true, handsLift = false, handsAlways = false, handsVisual = false, rescueThreshold = 35, npcEvade = false,
-    puppetMove = true, puppetStrength = 60, puppetStyle = "Duelist", catchFall = true, abilAssist = false, abilGui = false,
-    stalker = true, stalkerSafe = false, fxSharingan = false, dbgVerbose = false,
+    puppetMove = false, puppetStrength = 60, puppetStyle = "Duelist", catchFall = true, abilAssist = false, abilGui = false,
+    stalker = false, stalkerSafe = false, keepDistance = false, fxSharingan = false, dbgVerbose = false,
     choreo = false, choreoReturn = true, aoeTele = false, finisher = false, finisherKey = "", finisherHp = 10, lootGrab = false,
     shadowM1 = false, m1Range = 12, m1Rate = 3, m1Combo = false, stunBreak = false, healTiming = false, healAt = 40,
     puppetHold = false, holdRadius = 30, holdLeash = 60, holdGoSpawn = false, scanner = true,
@@ -529,6 +530,17 @@ if settings.v57c ~= true then
     settings.combatAim = false
     settings.aimSilent = false
     settings.aimMove = false
+end
+-- 5.7d: only Predictive Dodge runs by default — distance-keeping must be toggled on
+if settings.v57d ~= true then
+    settings.v57d = true
+    settings.autododge = true
+    settings.stalker = false
+    settings.stalkerSafe = false
+    settings.puppetMove = false
+    settings.autoProtect = false
+    settings.keepDistance = false
+    settings.npcEvade = false
 end
 settings.handsAlways = false
 settings.introHands = false
@@ -2214,7 +2226,7 @@ onHeartbeat("antivoid", function(dt)
 end)
 
 -- Click teleport (Ctrl+Click on PC, tool on mobile)
-local mouse = LP:GetMouse()
+local mouse; pcall(function() mouse = LP:GetMouse() end)
 GV.tpTool = nil
 -- All hub teleports go through here so Guardian Brain can verify them and switch to small steps
 -- when a game reverts instant teleports.
@@ -2638,7 +2650,7 @@ GV.PROFILE_KEYS = {"walkspeed", "jumppower", "fov", "gravity", "clock", "flyspee
     "fullbright", "esp", "antifling", "antivoid", "clicktp", "nofog", "lowgfx", "hud", "autorejoin", "timeOverride", "gravityOverride",
     "staffAction", "panicSafeSpot", "instantprompts", "autointeract", "interactFilter", "autoclick", "clickrate", "xray", "xrayAmount",
     "nightvision", "walkwater", "maxzoom", "camnoclip",
-    "puppetMove", "puppetStrength", "puppetStyle", "abilAssist", "stalker", "stalkerSafe", "fxSharingan",
+    "puppetMove", "puppetStrength", "puppetStyle", "abilAssist", "stalker", "stalkerSafe", "keepDistance", "fxSharingan",
     "choreo", "choreoReturn", "aoeTele", "finisher", "finisherKey", "finisherHp", "lootGrab", "shadowM1", "m1Range", "m1Rate", "m1Combo",
     "puppetHold", "holdRadius", "holdLeash", "holdGoSpawn", "scanner", "awakenPve", "kamui", "kamuiHp", "radarWorld", "introHands", "farm",
     "stunBreak", "healTiming", "healAt", "rescueStart", "rescueSafe", "handsGrab", "handsVisual", "waterGuard",
@@ -3952,8 +3964,8 @@ CORE.safeModule("14g Guardian Brain", function()   -- own function scope: keeps 
                 table.insert(hpHist, 1, {t = t, hp = h.Health, max = h.MaxHealth})
                 if #hpHist > 6 then table.remove(hpHist) end
             end
-            -- keep distance: hostile player closing in while you're hurt
-            if settings.autoProtect and h and r and h.Health > 0 and h.Health < h.MaxHealth * 0.5 and t - lastProtect > 6 then
+            -- keep distance: ONLY if user enabled Keep Distance / Stalker (never auto from Auto-protect alone)
+            if (settings.keepDistance == true or settings.stalker == true) and h and r and h.Health > 0 and h.Health < h.MaxHealth * 0.5 and t - lastProtect > 6 then
                 local e, d = nearestEnemy(8)
                 local er = e and e.Character and e.Character:FindFirstChild("HumanoidRootPart")
                 if er and d then lastProtect = t retreat(er.Position, "keeping distance") end
@@ -13038,7 +13050,7 @@ CORE.safeModule("14w Void Net", function()
     local netOwnerFn = exfn("isnetworkowner")
     local align, orient, att0, beam, tipAtt, tipPart = nil, nil, nil, nil, nil, nil
     local orbitAng, lastSay = 0, -100
-    local mouse = LP:GetMouse()
+    local mouse; pcall(function() mouse = LP:GetMouse() end)
 
     local function now() return os.clock() end
     local function lite() return PERF.lite or isTouch end
@@ -14485,7 +14497,8 @@ CORE.safeModule("14z Combat Aim", function()
         why = "", locks = 0, pulls = 0, spoof = false,
     }
     CORE.aim = AIM
-    local mouse = LP:GetMouse()
+    local mouse
+    pcall(function() mouse = LP:GetMouse() end)
     local hookmeta = exfn("hookmetamethod")
     local newcc = exfn("newcclosure") or function(f) return f end
     local netOwnerFn = exfn("isnetworkowner")
@@ -14763,6 +14776,8 @@ CORE.safeModule("14z Combat Aim", function()
     local function installSilent()
         if AIM.spoof or not hookmeta then return end
         if settings.combatAim ~= true or settings.aimSilent ~= true then return end
+        if not mouse then pcall(function() mouse = LP:GetMouse() end) end
+        if not mouse then return end
         local ok = pcall(function()
             oldIndex = hookmeta(mouse, "__index", newcc(function(self, key)
                 local okH, hit = pcall(function()
@@ -15738,6 +15753,7 @@ end
 -- 19. Start page
 -- =====================================================================
 GV.NEWS = {
+    {"5.7d", "Dodge only by default: Predictive Dodge ON · Stalker / Puppet Move / Auto-protect / Keep Distance OFF until you enable them."},
     {"5.7c", "SAFE BOOT: game no longer closes on start — silent aim hooks Mouse (not game.__index), Void Override namecall is lazy, Combat Aim OFF until you enable it."},
     {"5.7b", "Combat Aim crash fix: safe lookAt, silent-aim never throws, attack debounce, Enemies scan cached/capped — NPC M1 no longer kills the app."},
     {"5.7b", "PVP Combat Aim fixed: Aim at players ON by default, real Players scan, hard camera snap on attack, FOV ignored while attacking, lead on movers."},
@@ -16080,7 +16096,8 @@ function H.buildStart(parent)
     local bs = K.section(startBody, "Brain settings", nil, false)
     K.toggle(bs, "Guardian Brain", "brainOn", function(on) if not on and brain.restoreShield then brain.restoreShield() end end, "Learns hazards, anti-cheat, threats and which attacks work")
     K.toggle(bs, "Auto-limit risky features", "brainLimit", nil, "Caps speed / fly and uses step teleports where the game reacted")
-    K.toggle(bs, "Auto-protect (retreat)", "autoProtect", nil, "When a hostile player hurts you: retreat, keep distance, Safe Spot")
+    K.toggle(bs, "Auto-protect (retreat)", "autoProtect", nil, "OFF by default · when a hostile hurts you: retreat / Safe Spot (not continuous spacing)")
+    K.toggle(bs, "Keep distance", "keepDistance", nil, "OFF by default · when hurt + enemy close: step back / retreat. Dodge still works without this.")
     K.toggle(bs, "Threat ESP", "threatEsp", nil, "Colors Watch players yellow, Enemies red")
     K.toggle(bs, "Hazard shield", "hazardShield", function(on) if not on and brain.restoreShield then brain.restoreShield() end end, "Learned hazards stop touching you (client-side)")
     K.toggle(bs, "Auto-use healing tool", "autoHeal", nil, "Equips a heal / food tool from your backpack when low")
@@ -16358,7 +16375,7 @@ function H.buildDxlta(parent)
     label(df, {Size = UDim2.new(1, 0, 0, 30), Text = "Guardian Godmode keeps hits from landing and shows below what still got through. Stacks with Anti-Death.",
         TextColor3 = C.sub, TextSize = 11, TextWrapped = true, LayoutOrder = K.nextOrder(), ZIndex = 4})
     liveRow(df, "Godmode status", function() return CORE.ggod.status and CORE.ggod.status() or "-" end)
-    K.toggle(df, "Predictive Dodge", "autododge", nil, "Reads wind-up animations, lunges, projectiles and hitboxes · moves you BEFORE the hit · NPCs + players")
+    K.toggle(df, "Predictive Dodge", "autododge", nil, "ON by default · sidestep BEFORE the hit only · does NOT keep standing distance (use Keep Distance / Stalker for that)")
     liveRow(df, "Dodge record", function()
         local st = CORE.sense.stats or {}
         return (st.evaded or 0) .. " clean · " .. (st.hitAnyway or 0) .. " hit anyway"
@@ -16375,7 +16392,7 @@ function H.buildDxlta(parent)
     -- Puppeteer Mode (4.1)
     local pm = K.section(pg, "Puppeteer Mode", nil, true)
     K.toggle(pm, "Puppeteer Mode", "puppetMove", function(on) if not on and CORE.move.clear then CORE.move.clear("puppet") end end,
-        "In combat the hands steer you: out of attack arcs, circle-strafe, distance · your joystick still blends in")
+        "OFF by default · continuous spacing / strafe in combat · turn ON only if you want auto distance (Dodge works without this)")
     K.slider(pm, "Puppeteer strength %", "puppetStrength", 0, 100, nil, 5)
     K.cycle(pm, "Combat style", "puppetStyle", {"Duelist", "Evasive", "Kite"}, "Duelist: stay close, sidestep · Evasive: ~18 studs · Kite: ~32 studs")
     K.toggle(pm, "Catch falls", "catchFall", nil, "Hands cup under you and slow long falls onto real ground")
@@ -16402,7 +16419,7 @@ function H.buildDxlta(parent)
     end
     -- Stalker Shield (4.1)
     local sk = K.section(pg, "Stalker Shield", nil, false)
-    K.toggle(sk, "Stalker Shield", "stalker", nil, "Someone keeps hunting you: evade, keep distance, taunt only after a verified escape")
+    K.toggle(sk, "Stalker Shield", "stalker", nil, "OFF by default · someone keeps hunting you: push away / keep spacing · turn ON if you want auto distance")
     K.toggle(sk, "Escape to Safe Spot", "stalkerSafe", nil, "When a stalker keeps hitting you or you drop under 50%")
     liveRow(sk, "Stalkers", function() return CORE.stalk.summary and CORE.stalk.summary() or "-" end)
     label(sk, {Size = UDim2.new(1, 0, 0, 30), Text = "Defensive only: Stalker Shield never attacks, flings or damages anyone. It only moves YOU.",
