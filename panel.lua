@@ -2,6 +2,7 @@
     DXLTA Blox Fruits — Hub Panel
     Obsidian + acid lime · BF tools from Explorer dump paths
     (workspace.Enemies / Characters / NPCs, RS.Modules.Net, Busy/Stun/Energy/HasBuso)
+    Scout · Erweitern: SCAN / COPY Dump / COPY Logs / COPY Status (in-panel)
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/cursor/bf-panel-ff0d/panel.lua"))()
 
@@ -14,7 +15,7 @@ local ENV = (type(getgenv) == "function" and getgenv()) or _G
 if ENV.__DXLTA_BF_PANEL and type(ENV.__DXLTA_BF_PANEL.unload) == "function" then
     pcall(ENV.__DXLTA_BF_PANEL.unload)
 end
-ENV.__DXLTA_BF_PANEL = { version = "1.1" }
+ENV.__DXLTA_BF_PANEL = { version = "1.2" }
 local HUB = ENV.__DXLTA_BF_PANEL
 
 local okBoot, bootErr = xpcall(function()
@@ -99,6 +100,14 @@ local farmTargetName = nil
 local lastClick = 0
 local lastQuestTry = 0
 local killWatch = setmetatable({}, { __mode = "k" })
+
+-- Scout ring log + last dump
+local RING_MAX = 80
+local ringLog = {}
+local lastDumpText = ""
+local lastDumpLines = {}
+local lastFarmLogged = "idle"
+local lastAuraNear = nil
 
 local function track(conn)
     if conn then
@@ -282,15 +291,59 @@ local function findCommF()
     return nil
 end
 
+local function ringPush(msg)
+    local line = string.format("[%s] %s", os.date("%H:%M:%S"), tostring(msg))
+    table.insert(ringLog, line)
+    while #ringLog > RING_MAX do
+        table.remove(ringLog, 1)
+    end
+end
+
+local function ringText()
+    if #ringLog == 0 then
+        return "(keine logs — farm/quest/aura starten)"
+    end
+    return table.concat(ringLog, "\n")
+end
+
+local function copyClip(text)
+    text = tostring(text or "")
+    local ok = false
+    if type(setclipboard) == "function" then
+        ok = pcall(setclipboard, text)
+    end
+    if not ok and type(toclipboard) == "function" then
+        ok = pcall(toclipboard, text)
+    end
+    if not ok and type(set_clipboard) == "function" then
+        ok = pcall(set_clipboard, text)
+    end
+    return ok
+end
+
 local function invokeComm(...)
     local f = findCommF()
     if not f then
+        ringPush("CommF_ missing")
         return false, "CommF_ missing"
     end
     local args = table.pack(...)
+    local label = tostring(args[1] or "?")
+    for i = 2, math.min(args.n, 4) do
+        label = label .. "," .. tostring(args[i])
+    end
     local ok, res = pcall(function()
         return f:InvokeServer(table.unpack(args, 1, args.n))
     end)
+    local brief = tostring(res)
+    if #brief > 64 then
+        brief = brief:sub(1, 61) .. "…"
+    end
+    if ok then
+        ringPush("CommF_ " .. label .. " → " .. brief)
+    else
+        ringPush("CommF_ ERR " .. label .. " → " .. brief)
+    end
     return ok, res
 end
 
@@ -639,6 +692,341 @@ local function scanNetRemotes()
     return lines, #kids
 end
 
+-- ── Scout / Explorer dump ───────────────────────────────────────────────────
+
+local SCOUT_MAX_LINES = 3000
+local SCOUT_MAX_DEPTH = 7
+
+local SCOUT_INTEREST = {
+    RemoteEvent = true,
+    RemoteFunction = true,
+    UnreliableRemoteEvent = true,
+    BindableEvent = true,
+    BindableFunction = true,
+    Folder = true,
+    ModuleScript = true,
+    Script = true,
+    LocalScript = true,
+    Tool = true,
+    Configuration = true,
+}
+
+local function getFullPath(inst)
+    if not inst then
+        return "nil"
+    end
+    local parts = {}
+    local cur = inst
+    while cur and cur ~= game do
+        table.insert(parts, 1, cur.Name)
+        cur = cur.Parent
+    end
+    return "game." .. table.concat(parts, ".")
+end
+
+local function seaLabel()
+    local pid = game.PlaceId
+    if pid == 2753915549 then
+        return "First Sea"
+    elseif pid == 4442272183 then
+        return "Second Sea"
+    elseif pid == 7449423635 then
+        return "Third Sea"
+    end
+    return "unknown"
+end
+
+local function childSummary(container, limit)
+    if not container then
+        return "(none)"
+    end
+    limit = limit or 80
+    local names = {}
+    local ok, kids = pcall(function()
+        return container:GetChildren()
+    end)
+    if not ok or not kids then
+        return "(error)"
+    end
+    for i, c in ipairs(kids) do
+        if i > limit then
+            table.insert(names, "…+" .. tostring(#kids - limit))
+            break
+        end
+        table.insert(names, string.format("%s[%s]", c.Name, c.ClassName))
+    end
+    if #names == 0 then
+        return "(empty)"
+    end
+    return table.concat(names, ", ")
+end
+
+local function isPriorityName(name)
+    local n = string.lower(tostring(name or ""))
+    if n == "remotes" or n == "net" or n == "comm" or n == "modules" then
+        return true
+    end
+    if string.find(n, "remote", 1, true) or string.find(n, "comm", 1, true) then
+        return true
+    end
+    return false
+end
+
+local function shouldListScout(inst)
+    if SCOUT_INTEREST[inst.ClassName] then
+        return true
+    end
+    if inst:IsA("RemoteEvent") or inst:IsA("RemoteFunction") or inst:IsA("UnreliableRemoteEvent") then
+        return true
+    end
+    if isPriorityName(inst.Name) then
+        return true
+    end
+    return false
+end
+
+local function isFxSpamPath(pathLower, inst)
+    if string.find(pathLower, "%.fx%.", 1, true) or string.find(pathLower, "%.effects%.", 1, true) then
+        if inst.ClassName == "Configuration" or string.find(string.lower(inst.Name), "config", 1, true) then
+            return true
+        end
+    end
+    local n = string.lower(inst.Name)
+    if n == "fx" or n == "effects" or n == "vfx" then
+        return true
+    end
+    return false
+end
+
+local function parseFilterTerms(raw)
+    local terms = {}
+    raw = string.lower(tostring(raw or ""))
+    for part in string.gmatch(raw, "[^,;]+") do
+        part = trim(part)
+        if part ~= "" then
+            table.insert(terms, part)
+        end
+    end
+    return terms
+end
+
+local function lineMatchesFilter(line, terms)
+    if not terms or #terms == 0 then
+        return true
+    end
+    local low = string.lower(line)
+    for _, t in ipairs(terms) do
+        if string.find(low, t, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function scoutWalk(root, lines, truncated, depthCap, skipChildNames)
+    if truncated[1] or not root then
+        return
+    end
+    skipChildNames = skipChildNames or {}
+    local function walk(inst, depth, underFx)
+        if truncated[1] then
+            return
+        end
+        if depth > depthCap then
+            return
+        end
+        if #lines >= SCOUT_MAX_LINES then
+            truncated[1] = true
+            table.insert(lines, "... TRUNCATED (max ~3000 lines) ...")
+            return
+        end
+        local path = getFullPath(inst)
+        local pathLow = string.lower(path)
+        local fxHere = underFx or isFxSpamPath(pathLow, inst)
+        local list = shouldListScout(inst)
+        if list and not (fxHere and inst.ClassName == "Configuration") then
+            table.insert(lines, string.format("%s | %s", inst.ClassName, path))
+        elseif list and fxHere then
+            if isPriorityName(inst.Name) or inst:IsA("RemoteEvent") or inst:IsA("RemoteFunction") then
+                table.insert(lines, string.format("%s | %s", inst.ClassName, path))
+            end
+        end
+        if fxHere and not isPriorityName(inst.Name) and not (inst:IsA("RemoteEvent") or inst:IsA("RemoteFunction") or inst:IsA("UnreliableRemoteEvent")) then
+            if inst.ClassName == "Configuration" or depth > 1 then
+                return
+            end
+        end
+        local ok, kids = pcall(function()
+            return inst:GetChildren()
+        end)
+        if not ok or not kids then
+            return
+        end
+        local pri, rest = {}, {}
+        for _, c in ipairs(kids) do
+            if depth == 0 and skipChildNames[c.Name] then
+                -- already dumped in priority pass
+            elseif isPriorityName(c.Name) or c:IsA("RemoteEvent") or c:IsA("RemoteFunction") or c:IsA("UnreliableRemoteEvent") then
+                table.insert(pri, c)
+            else
+                table.insert(rest, c)
+            end
+        end
+        for _, c in ipairs(pri) do
+            walk(c, depth + 1, fxHere)
+            if truncated[1] then
+                return
+            end
+        end
+        for _, c in ipairs(rest) do
+            walk(c, depth + 1, fxHere)
+            if truncated[1] then
+                return
+            end
+        end
+    end
+    walk(root, 0, false)
+end
+
+local function buildScoutHeader()
+    local lines = {}
+    table.insert(lines, "========== DXLTA SCOUT DUMP ==========")
+    table.insert(lines, string.format(
+        "PlaceId=%s  GameId=%s  JobId=%s",
+        tostring(game.PlaceId),
+        tostring(game.GameId),
+        tostring(game.JobId)
+    ))
+    table.insert(lines, string.format("Sea=%s  Time=%s", seaLabel(), os.date("%Y-%m-%d %H:%M:%S")))
+    local lv = dataVal("Level")
+    table.insert(lines, string.format("Level=%s  Player=%s", tostring(lv ~= nil and lv or "?"), LocalPlayer.Name))
+    local data = LocalPlayer:FindFirstChild("Data")
+    table.insert(lines, "LocalPlayer.Data children: " .. childSummary(data, 60))
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    table.insert(lines, "RS.Remotes children: " .. childSummary(remotes, 80))
+    local net = getNetFolder()
+    table.insert(lines, "Modules.Net children: " .. childSummary(net, 80))
+    local enemies = getEnemiesFolder()
+    local sample = {}
+    if enemies then
+        local ok, kids = pcall(function()
+            return enemies:GetChildren()
+        end)
+        if ok and kids then
+            for i, m in ipairs(kids) do
+                if i > 25 then
+                    table.insert(sample, "…+" .. tostring(#kids - 25))
+                    break
+                end
+                table.insert(sample, m.Name)
+            end
+        end
+    end
+    table.insert(lines, "workspace.Enemies sample: " .. (#sample > 0 and table.concat(sample, ", ") or "(none)"))
+    table.insert(lines, "------------------------------------------")
+    table.insert(lines, "Format: ClassName | game.Path  ·  remotes/net/comm first · skip deep FX.Configuration")
+    table.insert(lines, string.format("MaxDepth=%d  MaxLines=%d", SCOUT_MAX_DEPTH, SCOUT_MAX_LINES))
+    table.insert(lines, "------------------------------------------")
+    return lines
+end
+
+local function runScoutScan(filterRaw)
+    local lines = buildScoutHeader()
+    local truncated = { false }
+
+    -- Priority roots first
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if remotes then
+        table.insert(lines, "")
+        table.insert(lines, "### ReplicatedStorage.Remotes ###")
+        scoutWalk(remotes, lines, truncated, SCOUT_MAX_DEPTH)
+    end
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    if modules and not truncated[1] then
+        table.insert(lines, "")
+        table.insert(lines, "### ReplicatedStorage.Modules ###")
+        scoutWalk(modules, lines, truncated, SCOUT_MAX_DEPTH)
+    end
+    local enemies = getEnemiesFolder()
+    if enemies and not truncated[1] then
+        table.insert(lines, "")
+        table.insert(lines, "### workspace.Enemies (shallow) ###")
+        for _, m in ipairs(enemies:GetChildren()) do
+            if #lines >= SCOUT_MAX_LINES then
+                truncated[1] = true
+                break
+            end
+            table.insert(lines, string.format("%s | %s", m.ClassName, getFullPath(m)))
+        end
+    end
+
+    if not truncated[1] then
+        table.insert(lines, "")
+        table.insert(lines, "### Workspace ###")
+        scoutWalk(Workspace, lines, truncated, SCOUT_MAX_DEPTH, { Enemies = true })
+    end
+    if not truncated[1] then
+        table.insert(lines, "")
+        table.insert(lines, "### ReplicatedStorage (rest) ###")
+        scoutWalk(ReplicatedStorage, lines, truncated, SCOUT_MAX_DEPTH, { Remotes = true, Modules = true })
+    end
+    local extra = {
+        "ReplicatedFirst",
+        "Players",
+        "Lighting",
+        "StarterGui",
+        "StarterPack",
+    }
+    for _, name in ipairs(extra) do
+        if truncated[1] then
+            break
+        end
+        local ok, root = pcall(function()
+            return game:GetService(name)
+        end)
+        if ok and root then
+            table.insert(lines, "")
+            table.insert(lines, string.format("### %s ###", name))
+            scoutWalk(root, lines, truncated, SCOUT_MAX_DEPTH)
+        end
+    end
+
+    table.insert(lines, "")
+    table.insert(lines, string.format("========== END (%d lines) ==========", #lines + 1))
+
+    lastDumpLines = lines
+    lastDumpText = table.concat(lines, "\n")
+
+    local terms = parseFilterTerms(filterRaw)
+    if #terms == 0 then
+        return lastDumpText, lines, #lines
+    end
+    local filtered = {}
+    for _, line in ipairs(lines) do
+        if lineMatchesFilter(line, terms) then
+            table.insert(filtered, line)
+        end
+    end
+    return table.concat(filtered, "\n"), filtered, #lines
+end
+
+local function statusOneLiner()
+    pcall(refreshStatus)
+    local farmOn = STATE.farm and "ON" or "OFF"
+    return string.format(
+        "LV=%s farm=%s kills=%s near=%s Busy=%s Stun=%s Buso=%s remotes=%s sea=%s",
+        tostring(ST.level),
+        farmOn,
+        tostring(ST.kills),
+        tostring(ST.nearest),
+        tostring(ST.busy),
+        tostring(ST.stun),
+        tostring(ST.buso),
+        tostring(ST.remotes),
+        seaLabel()
+    )
+end
+
 -- ── Noclip / Fly ────────────────────────────────────────────────────────────
 
 local function applyNoclip(on)
@@ -885,6 +1273,10 @@ local function killAuraTick()
         return
     end
     ST.nearest = string.format("%s · %dm", tg.name, math.floor(d or 0))
+    if STATE.killAura and tg.name ~= lastAuraNear then
+        lastAuraNear = tg.name
+        ringPush("aura → " .. tg.name .. " @" .. math.floor(d or 0) .. "m")
+    end
     local r = localRoot()
     if r then
         local look = Vector3.new(tg.root.Position.X, r.Position.Y, tg.root.Position.Z)
@@ -1006,6 +1398,7 @@ local function tryAutoQuest()
     lastQuestTry = os.clock()
     local plan = questPlan()
     if plan then
+        ringPush("quest try " .. tostring(plan[2]) .. " #" .. tostring(plan[3]) .. " → " .. tostring(plan[4]))
         local ok = invokeComm("StartQuest", plan[2], plan[3])
         if ok then
             farmTargetName = plan[4]
@@ -1013,6 +1406,9 @@ local function tryAutoQuest()
             notify("DXLTA", "StartQuest " .. plan[2] .. " #" .. tostring(plan[3]), 2)
             return
         end
+        ringPush("quest CommF_ failed · fallback prompt")
+    else
+        ringPush("quest: no plan for level")
     end
     local giver, dist = findQuestGiver()
     if giver then
@@ -1024,6 +1420,9 @@ local function tryAutoQuest()
         end
         firePromptsNear(giver)
         ST.farm = "prompt @ " .. giver.Name
+        ringPush("quest prompt @ " .. giver.Name)
+    else
+        ringPush("quest: no giver found")
     end
 end
 
@@ -1113,8 +1512,8 @@ screen.Parent = guiParent
 
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
-panel.Size = UDim2.fromOffset(360, 560)
-panel.Position = UDim2.new(0, 24, 0.5, -280)
+panel.Size = UDim2.fromOffset(370, 580)
+panel.Position = UDim2.new(0, 24, 0.5, -290)
 panel.BackgroundColor3 = COLORS.panel
 panel.BorderSizePixel = 0
 panel.Parent = screen
@@ -1491,7 +1890,10 @@ end)
 makeSlider("Tween / Farm speed", "bfSpeed", 50, 300)
 
 sectionLabel("COMBAT / FARM")
-makeToggle("Kill Aura", "killAura")
+makeToggle("Kill Aura", "killAura", function(on)
+    lastAuraNear = nil
+    ringPush(on and "kill aura ON" or "kill aura OFF")
+end)
 makeSlider("Aura range", "kaRange", 5, 50)
 makeSlider("Attack rate", "kaRate", 1, 12)
 makeToggle("Auto Level / Farm", "farm", function(on)
@@ -1499,11 +1901,15 @@ makeToggle("Auto Level / Farm", "farm", function(on)
         pin = nil
         stopTravel()
         ST.farm = "idle"
+        ringPush("farm OFF")
     else
         ST.farm = "starting"
+        ringPush("farm ON")
     end
 end)
-makeToggle("Auto Quest (CommF_ / Prompt)", "autoQuest")
+makeToggle("Auto Quest (CommF_ / Prompt)", "autoQuest", function(on)
+    ringPush(on and "auto quest ON" or "auto quest OFF")
+end)
 
 sectionLabel("ESP")
 makeToggle("Gegner ESP (Enemies)", "enemyEsp", function(on)
@@ -1556,27 +1962,198 @@ makeButton("Net Remotes aktualisieren", COLORS.limeSoft, function()
     remoteText.Text = table.concat(lines, "\n")
 end)
 
-sectionLabel("WAS DU NOCH SCANNEN SOLLST")
-local tip = Instance.new("TextLabel")
-tip.BackgroundColor3 = COLORS.bg
-tip.Size = UDim2.new(1, 0, 0, 96)
-tip.Font = Enum.Font.Gotham
-tip.TextSize = 11
-tip.TextXAlignment = Enum.TextXAlignment.Left
-tip.TextYAlignment = Enum.TextYAlignment.Top
-tip.TextColor3 = COLORS.muted
-tip.TextWrapped = true
-tip.Text =
-    "  Run explorer with filter Remote or Modules.Net / CommF and paste results here for Fruit sniper, Buso remote, chests, etc.\n\n  loadstring → cursor/explorer-dump-ff0d/explorer.lua"
-tip.LayoutOrder = nextOrder()
-tip.Parent = body
-local tipCorner = Instance.new("UICorner")
-tipCorner.CornerRadius = UDim.new(0, 6)
-tipCorner.Parent = tip
-local tipPad = Instance.new("UIPadding")
-tipPad.PaddingTop = UDim.new(0, 8)
-tipPad.PaddingLeft = UDim.new(0, 4)
-tipPad.Parent = tip
+sectionLabel("SCOUT · ERWEITERN")
+local scoutHint = Instance.new("TextLabel")
+scoutHint.BackgroundColor3 = COLORS.bg
+scoutHint.Size = UDim2.new(1, 0, 0, 40)
+scoutHint.Font = Enum.Font.Gotham
+scoutHint.TextSize = 11
+scoutHint.TextXAlignment = Enum.TextXAlignment.Left
+scoutHint.TextYAlignment = Enum.TextYAlignment.Top
+scoutHint.TextColor3 = COLORS.limeSoft
+scoutHint.TextWrapped = true
+scoutHint.Text = "  Scan → Copy → Dump hier im Chat einfügen → wir erweitern den Script"
+scoutHint.LayoutOrder = nextOrder()
+scoutHint.Parent = body
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = scoutHint
+    local p = Instance.new("UIPadding")
+    p.PaddingTop = UDim.new(0, 8)
+    p.PaddingLeft = UDim.new(0, 4)
+    p.PaddingRight = UDim.new(0, 4)
+    p.Parent = scoutHint
+end
+
+local scoutFilter = Instance.new("TextBox")
+scoutFilter.Name = "ScoutFilter"
+scoutFilter.PlaceholderText = "Remote, CommF, Modules.Net, Enemies"
+scoutFilter.Text = ""
+scoutFilter.ClearTextOnFocus = false
+scoutFilter.Size = UDim2.new(1, 0, 0, 32)
+scoutFilter.BackgroundColor3 = COLORS.bg
+scoutFilter.TextColor3 = COLORS.text
+scoutFilter.PlaceholderColor3 = COLORS.muted
+scoutFilter.Font = Enum.Font.Code
+scoutFilter.TextSize = 12
+scoutFilter.TextXAlignment = Enum.TextXAlignment.Left
+scoutFilter.LayoutOrder = nextOrder()
+scoutFilter.Parent = body
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = scoutFilter
+    local s = Instance.new("UIStroke")
+    s.Color = COLORS.border
+    s.Thickness = 1
+    s.Parent = scoutFilter
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.Parent = scoutFilter
+end
+
+local scoutStatus = Instance.new("TextLabel")
+scoutStatus.BackgroundTransparency = 1
+scoutStatus.Size = UDim2.new(1, 0, 0, 16)
+scoutStatus.Font = Enum.Font.Gotham
+scoutStatus.TextSize = 11
+scoutStatus.TextXAlignment = Enum.TextXAlignment.Left
+scoutStatus.TextColor3 = COLORS.muted
+scoutStatus.Text = "Scout bereit"
+scoutStatus.LayoutOrder = nextOrder()
+scoutStatus.Parent = body
+
+local function setScoutStatus(msg, ok)
+    scoutStatus.Text = tostring(msg)
+    if ok == true then
+        scoutStatus.TextColor3 = COLORS.lime
+    elseif ok == false then
+        scoutStatus.TextColor3 = COLORS.danger
+    else
+        scoutStatus.TextColor3 = COLORS.muted
+    end
+end
+
+local scoutPreviewWrap = Instance.new("Frame")
+scoutPreviewWrap.Size = UDim2.new(1, 0, 0, 120)
+scoutPreviewWrap.BackgroundColor3 = COLORS.bg
+scoutPreviewWrap.BorderSizePixel = 0
+scoutPreviewWrap.LayoutOrder = nextOrder()
+scoutPreviewWrap.Parent = body
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = scoutPreviewWrap
+    local s = Instance.new("UIStroke")
+    s.Color = COLORS.border
+    s.Thickness = 1
+    s.Parent = scoutPreviewWrap
+end
+
+local scoutScroll = Instance.new("ScrollingFrame")
+scoutScroll.Size = UDim2.new(1, -10, 1, -8)
+scoutScroll.Position = UDim2.fromOffset(5, 4)
+scoutScroll.BackgroundTransparency = 1
+scoutScroll.BorderSizePixel = 0
+scoutScroll.ScrollBarThickness = 4
+scoutScroll.ScrollBarImageColor3 = COLORS.limeDim
+scoutScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scoutScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scoutScroll.Parent = scoutPreviewWrap
+
+local scoutPreview = Instance.new("TextLabel")
+scoutPreview.BackgroundTransparency = 1
+scoutPreview.Size = UDim2.new(1, -6, 0, 0)
+scoutPreview.Position = UDim2.fromOffset(2, 0)
+scoutPreview.AutomaticSize = Enum.AutomaticSize.Y
+scoutPreview.Font = Enum.Font.Code
+scoutPreview.TextSize = 10
+scoutPreview.TextXAlignment = Enum.TextXAlignment.Left
+scoutPreview.TextYAlignment = Enum.TextYAlignment.Top
+scoutPreview.TextColor3 = COLORS.muted
+scoutPreview.TextWrapped = true
+scoutPreview.Text = "(noch kein dump — SCAN Explorer)"
+scoutPreview.Parent = scoutScroll
+
+local function setScoutPreview(text)
+    local t = tostring(text or "")
+    -- UI truncated; full text kept in lastDumpText for COPY
+    if #t > 3500 then
+        scoutPreview.Text = t:sub(1, 3500) .. "\n… (UI truncated — COPY Dump = full)"
+    else
+        scoutPreview.Text = t ~= "" and t or "(leer)"
+    end
+end
+
+local function filteredDumpView()
+    local terms = parseFilterTerms(scoutFilter.Text)
+    if lastDumpText == "" then
+        return ""
+    end
+    if #terms == 0 then
+        return lastDumpText
+    end
+    local filtered = {}
+    for _, line in ipairs(lastDumpLines) do
+        if lineMatchesFilter(line, terms) then
+            table.insert(filtered, line)
+        end
+    end
+    return table.concat(filtered, "\n")
+end
+
+makeButton("SCAN Explorer", COLORS.lime, function()
+    setScoutStatus("Scanning…", nil)
+    task.wait()
+    local view, filteredLines, total = runScoutScan(scoutFilter.Text)
+    setScoutPreview(view)
+    setScoutStatus(string.format("Scan · %d Zeilen · Ansicht %d", total, #filteredLines), true)
+    ringPush("scout scan " .. tostring(total) .. " lines")
+end)
+
+makeButton("COPY Dump", COLORS.limeSoft, function()
+    if lastDumpText == "" then
+        setScoutStatus("Nichts zu kopieren — erst SCAN", false)
+        return
+    end
+    local text = filteredDumpView()
+    if text == "" then
+        text = lastDumpText
+    end
+    if copyClip(text) then
+        setScoutStatus("kopiert — hier an den Agent schicken", true)
+        notify("DXLTA", "kopiert — hier an den Agent schicken", 3)
+    else
+        setScoutStatus("Clipboard unavailable", false)
+    end
+end)
+
+makeButton("COPY Logs", Color3.fromRGB(120, 180, 70), function()
+    local text = ringText()
+    if copyClip(text) then
+        setScoutStatus("Logs kopiert (" .. tostring(#ringLog) .. " Zeilen)", true)
+        notify("DXLTA", "kopiert — hier an den Agent schicken", 3)
+    else
+        setScoutStatus("Clipboard unavailable", false)
+    end
+end)
+
+makeButton("COPY Status", Color3.fromRGB(90, 140, 60), function()
+    local line = statusOneLiner()
+    if copyClip(line) then
+        setScoutStatus("Status: " .. line, true)
+        notify("DXLTA", "kopiert — hier an den Agent schicken", 2)
+    else
+        setScoutStatus("Clipboard unavailable", false)
+    end
+end)
+
+scoutFilter:GetPropertyChangedSignal("Text"):Connect(function()
+    if lastDumpText ~= "" then
+        setScoutPreview(filteredDumpView())
+    end
+end)
 
 local footer = Instance.new("TextLabel")
 footer.BackgroundTransparency = 1
@@ -1586,7 +2163,7 @@ footer.TextSize = 10
 footer.TextXAlignment = Enum.TextXAlignment.Left
 footer.TextColor3 = COLORS.muted
 footer.TextWrapped = true
-footer.Text = "Pfade: workspace.Enemies / Characters / NPCs · RS.Remotes.CommF_ · Flags Busy/Stun/Energy/HasBuso"
+footer.Text = "Pfade: workspace.Enemies / Characters / NPCs · RS.Remotes.CommF_ · Flags Busy/Stun/Energy/HasBuso · Scout in-panel"
 footer.LayoutOrder = nextOrder()
 footer.Parent = body
 
@@ -1753,6 +2330,7 @@ task.spawn(function()
             local ok, err = pcall(farmStep)
             if not ok then
                 ST.farm = "err"
+                ringPush("farm ERR " .. tostring(err):sub(1, 80))
                 warn("[DXLTA] farm: " .. tostring(err))
             end
         end
@@ -1778,6 +2356,10 @@ track(RunService.Heartbeat:Connect(function(dt)
             refreshPlayerEsp()
         end
         refreshStatus()
+        if ST.farm ~= lastFarmLogged then
+            lastFarmLogged = ST.farm
+            ringPush("farm: " .. tostring(ST.farm))
+        end
         if liveLabels.farm then
             liveLabels.farm.Text = tostring(ST.farm)
         end
