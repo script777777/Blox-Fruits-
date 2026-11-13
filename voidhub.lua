@@ -1,8 +1,9 @@
 --[[
-    DXLTA / Void Hub  v5.7d
+    DXLTA / Void Hub  v5.7e
     Renamed from secrethub.lua — live copy for script777777/Blox-Fruits-
-    5.7d: dodge-only by default · distance keep (Stalker/Puppet/Auto-protect) opt-in
-    5.7c: crash-safe boot (no game.__index / no eager namecall)
+    5.7e: Attack Stick — temp fly to player, stick under/behind, spam M1 + discovered skills
+    5.7d: dodge-only by default · distance keep opt-in
+    5.7c: crash-safe boot
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/cursor/voidhub-live-ff0d/voidhub.lua"))()
 ]]
@@ -41,7 +42,7 @@ ENV.__VoidHub = {}
 ENV.__SecretHub = ENV.__VoidHub -- legacy alias for older unloaders
 local HUB = ENV.__VoidHub
 HUB.tier = nil -- "free" | "premium" | nil (choose on Start)
-HUB.version = "5.7d"
+HUB.version = "5.7e"
 HUB.session = {dodges = 0, saves = 0, kills = 0, learned = 0, blocks = 0, started = os.clock()}
 
 -- =====================================================================
@@ -489,6 +490,8 @@ GV.DEFAULTS = {
     ovrMirror = false, ovrMarket = false,
     combatAim = false, aimCam = true, aimBody = true, aimSilent = false, aimMove = false,
     aimRange = 80, aimFov = 180, aimPlayers = true, aimStick = true,
+    atkStick = false, atkStickPos = "Under", atkStickRange = 90, atkStickGap = 3.2,
+    atkStickSpam = true, atkStickSkills = true, atkStickOnlyAtk = false, atkStickRate = 6,
     antiDeath = true, quietDeath = true,
     bfFruitNotify = true, bfFruitEsp = false, bfFruitSnipe = false, bfChest = false, bfFarm = false, bfQuest = false, bfStats = false,
     bfStat = "Melee", bfWeapon = "Melee", bfBuso = false, bfBusoVia = "J key", bfKen = false, bfSpeed = 150,
@@ -1978,6 +1981,7 @@ local function inputVector(h)
     return v
 end
 onRender("fly", function()
+    if CORE.stick and CORE.stick.steering then return end -- Attack Stick owns flight this frame
     if not settings.fly or #flyObjs == 0 then return end
     local h, r, cam = hum(), hrp(), workspace.CurrentCamera
     if not (h and r and cam) then return end
@@ -2660,6 +2664,7 @@ GV.PROFILE_KEYS = {"walkspeed", "jumppower", "fov", "gravity", "clock", "flyspee
     "ovrHitbox", "ovrHitboxAmp", "ovrParasite", "ovrCdStrip", "ovrSoftGod", "ovrDominion", "ovrMaps", "voidSiphon",
     "ovrMirror", "ovrMarket",
     "combatAim", "aimCam", "aimBody", "aimSilent", "aimMove", "aimRange", "aimFov", "aimPlayers", "aimStick",
+    "atkStick", "atkStickPos", "atkStickRange", "atkStickGap", "atkStickSpam", "atkStickSkills", "atkStickOnlyAtk", "atkStickRate",
     "antiDeath", "quietDeath",
     "bfFruitNotify", "bfFruitEsp", "bfFruitSnipe", "bfChest", "bfFarm", "bfQuest", "bfStats", "bfStat", "bfWeapon", "bfBuso", "bfBusoVia", "bfKen", "bfSpeed"}
 local profiles = loadJSON(GV.PROFILE_FILE, {})
@@ -14894,6 +14899,358 @@ CORE.safeModule("14z Combat Aim", function()
     CORE.log("BOOT", "Combat Aim online · crash-hardened · body + camera + silent Hit · Void Needle")
 end)
 
+
+-- =====================================================================
+-- 14aa Attack Stick 5.7e — temp fly → stick Under/Behind → spam M1 + kit
+-- Opt-in. Discovers tools, Z/X/C/V/F, and bottom-screen ability buttons.
+-- =====================================================================
+CORE.safeModule("14aa Attack Stick", function()
+    local ST = {
+        steering = false, tempFly = false, target = nil, root = nil, hum = nil, model = nil,
+        why = "off", sticks = 0, clicks = 0, skills = 0, kit = {}, kitT = -10,
+    }
+    CORE.stick = ST
+    local mouse1 = exfn("mouse1click")
+    local VIM, VU
+    pcall(function() VIM = game:GetService("VirtualInputManager") end)
+    pcall(function() VU = game:GetService("VirtualUser") end)
+    local ABI = CORE.abil
+    local function now() return os.clock() end
+    local function flat(v) return Vector3.new(v.X, 0, v.Z) end
+    local function armed()
+        return alive and settings.atkStick == true and settings.brainOn ~= false
+    end
+    local function wantActive()
+        if not armed() then return false end
+        if settings.atkStickOnlyAtk == true then
+            local SEN = CORE.sense
+            if SEN and SEN.userAttacking and SEN.userAttacking(1.2) then return true end
+            local c = char()
+            if c and c:FindFirstChildOfClass("Tool") then return true end
+            return false
+        end
+        return true
+    end
+    local function ensureTempFly()
+        if settings.fly == true then return end -- user fly already on
+        if ST.tempFly and #flyObjs > 0 then return end
+        pcall(FX.startFly)
+        ST.tempFly = true
+    end
+    local function releaseTempFly()
+        if not ST.tempFly then return end
+        ST.tempFly = false
+        if settings.fly ~= true then pcall(FX.stopFly) end
+    end
+    local function slotCF(root)
+        if not root then return nil end
+        local mode = tostring(settings.atkStickPos or "Under")
+        local ok, cf = pcall(function()
+            if mode == "Behind" then
+                return root.CFrame * CFrame.new(0, 1.2, 4.2)
+            elseif mode == "Front" then
+                return root.CFrame * CFrame.new(0, 1.2, -3.6)
+            end
+            -- Under (default)
+            return root.CFrame * CFrame.new(0, -4.8, 0)
+        end)
+        return ok and cf or nil
+    end
+    local function pickPlayer()
+        -- Prefer Combat Aim lock if it's a player
+        local AIM = CORE.aim
+        if AIM and AIM.model and AIM.root and AIM.root.Parent and AIM.hum and AIM.hum.Health > 0 then
+            local plr = Players:GetPlayerFromCharacter(AIM.model)
+            if plr and plr ~= LP then
+                return plr, AIM.model, AIM.hum, AIM.root
+            end
+        end
+        local me = hrp()
+        if not me then return nil end
+        local range = math.clamp(tonumber(settings.atkStickRange) or 90, 15, 200)
+        local best, bd, bm, bh, br
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and p.Character then
+                local h = p.Character:FindFirstChildOfClass("Humanoid")
+                local r = p.Character:FindFirstChild("HumanoidRootPart") or p.Character.PrimaryPart
+                if h and r and h.Health > 0 then
+                    if guardian.staff and guardian.staff[p.UserId] then
+                        -- skip staff
+                    else
+                        local d = (r.Position - me.Position).Magnitude
+                        if d <= range and (not bd or d < bd) then
+                            best, bd, bm, bh, br = p, d, p.Character, h, r
+                        end
+                    end
+                end
+            end
+        end
+        if not best then return nil end
+        return best, bm, bh, br
+    end
+    local function rebuildKit(force)
+        if not force and now() - ST.kitT < 1.5 then return end
+        ST.kitT = now()
+        local out = {}
+        local seen = {}
+        local function push(e)
+            if not e or not e.id or seen[e.id] then return end
+            seen[e.id] = true
+            out[#out + 1] = e
+        end
+        push({id = "M1", kind = "m1", label = "M1"})
+        local function addTool(tl)
+            if not (tl and tl:IsA("Tool")) or GV.isFruitItem(tl) then return end
+            local n = string.lower(tl.Name)
+            if string.find(n, "heal", 1, true) or string.find(n, "food", 1, true) then return end
+            push({id = "tool:" .. tl.Name, kind = "tool", label = tl.Name, ref = tl})
+        end
+        local bp = LP:FindFirstChildOfClass("Backpack")
+        if bp then for _, tl in ipairs(bp:GetChildren()) do addTool(tl) end end
+        local c = char()
+        if c then for _, tl in ipairs(c:GetChildren()) do addTool(tl) end end
+        -- Combat keys
+        for _, k in ipairs({"Z", "X", "C", "V", "F", "E", "R", "T", "Y", "Q"}) do
+            push({id = "key:" .. k, kind = "key", label = k, key = k})
+        end
+        -- ABI attack entries (tools/keys/gui)
+        if ABI and ABI.list then
+            for _, a in ipairs(ABI.list) do
+                if a.kind == "attack" then
+                    if a.src == "tool" and a.ref then
+                        push({id = "tool:" .. a.label, kind = "tool", label = a.label, ref = a.ref})
+                    elseif a.src == "key" and a.key then
+                        push({id = "key:" .. a.key, kind = "key", label = a.key, key = a.key})
+                    elseif a.src == "gui" and a.ref then
+                        push({id = "gui:" .. a.label, kind = "gui", label = a.label, ref = a.ref})
+                    end
+                end
+            end
+        end
+        -- Bottom / lower-third GUI ability buttons (mobile skill bars)
+        local pg = LP:FindFirstChildOfClass("PlayerGui")
+        if pg then
+            local cam = workspace.CurrentCamera
+            local vh = (cam and cam.ViewportSize.Y) or 800
+            local n = 0
+            for _, d in ipairs(pg:GetDescendants()) do
+                n += 1
+                if n > 5000 then break end
+                if d:IsA("GuiButton") and d.Visible and d.AbsoluteSize.X >= 28 and d.AbsoluteSize.Y >= 28 then
+                    local y = d.AbsolutePosition.Y + d.AbsoluteSize.Y * 0.5
+                    -- prefer controls in the lower 45% of the screen
+                    if y >= vh * 0.55 then
+                        local txt = string.lower(tostring(d.Name) .. " " .. ((d:IsA("TextButton") and d.Text) or ""))
+                        local skip = string.find(txt, "shop", 1, true) or string.find(txt, "setting", 1, true)
+                            or string.find(txt, "inventory", 1, true) or string.find(txt, "close", 1, true)
+                            or string.find(txt, "menu", 1, true) or string.find(txt, "chat", 1, true)
+                        if not skip then
+                            push({id = "gui:" .. d:GetFullName(), kind = "gui", label = (d:IsA("TextButton") and d.Text ~= "" and d.Text) or d.Name, ref = d})
+                        end
+                    end
+                end
+            end
+        end
+        ST.kit = out
+    end
+    local function clickM1()
+        local c, h = char(), hum()
+        if not (c and h) then return false end
+        local tl = c:FindFirstChildOfClass("Tool")
+        if not tl then
+            local bp = LP:FindFirstChildOfClass("Backpack")
+            if bp then
+                for _, t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") and not GV.isFruitItem(t) then
+                        pcall(function() h:EquipTool(t) end)
+                        tl = t
+                        break
+                    end
+                end
+            end
+        end
+        if tl then
+            local ok = pcall(function() tl:Activate() end)
+            if ok then ST.clicks += 1 end
+            return ok
+        end
+        if mouse1 then
+            local ok = pcall(mouse1)
+            if ok then ST.clicks += 1 end
+            return ok
+        end
+        if VU then
+            local ok = pcall(function()
+                VU:CaptureController()
+                VU:ClickButton1(Vector2.new())
+            end)
+            if ok then ST.clicks += 1 end
+            return ok
+        end
+        if VIM then
+            local ok = pcall(function()
+                local inset = SVC.GuiService:GetGuiInset()
+                local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+                local x, y = vp.X * 0.5, vp.Y * 0.55
+                VIM:SendMouseButtonEvent(x, y, 0, true, game, 0)
+                VIM:SendMouseButtonEvent(x, y, 0, false, game, 0)
+            end)
+            if ok then ST.clicks += 1 end
+            return ok
+        end
+        return false
+    end
+    local function pressKey(key)
+        if not VIM then return false end
+        local kc = Enum.KeyCode[key]
+        if not kc then return false end
+        local ok = pcall(function()
+            VIM:SendKeyEvent(true, kc, false, game)
+        end)
+        task.delay(0.05, function() pcall(function() VIM:SendKeyEvent(false, kc, false, game) end) end)
+        if ok then ST.skills += 1 end
+        return ok
+    end
+    local function clickGui(b)
+        if not (VIM and b and b.Parent) then return false end
+        local ok = pcall(function()
+            local inset = SVC.GuiService:GetGuiInset()
+            local p = b.AbsolutePosition + b.AbsoluteSize / 2 + inset
+            VIM:SendMouseButtonEvent(p.X, p.Y, 0, true, game, 0)
+            VIM:SendMouseButtonEvent(p.X, p.Y, 0, false, game, 0)
+        end)
+        if ok then ST.skills += 1 end
+        return ok
+    end
+    local kitIdx, lastFire = 1, -10
+    local function fireKit()
+        if settings.atkStickSpam ~= false then clickM1() end
+        if settings.atkStickSkills == false then return end
+        rebuildKit(false)
+        local n = #ST.kit
+        if n == 0 then return end
+        -- rotate through non-M1 entries + keep M1 every tick
+        for _ = 1, math.min(3, n) do
+            kitIdx = (kitIdx % n) + 1
+            local e = ST.kit[kitIdx]
+            if not e then break end
+            if e.kind == "m1" then
+                clickM1()
+            elseif e.kind == "tool" and e.ref then
+                local h, c = hum(), char()
+                if h and c and e.ref.Parent then
+                    pcall(function()
+                        if e.ref.Parent ~= c then h:EquipTool(e.ref) end
+                        e.ref:Activate()
+                    end)
+                    ST.skills += 1
+                end
+            elseif e.kind == "key" then
+                pressKey(e.key)
+            elseif e.kind == "gui" then
+                clickGui(e.ref)
+            end
+        end
+    end
+    local function steerTo(goal, dist)
+        local r = hrp()
+        if not (r and goal) then return end
+        local gap = math.clamp(tonumber(settings.atkStickGap) or 3.2, 1.5, 12)
+        ST.steering = true
+        if dist > gap + 1.5 then
+            ensureTempFly()
+            local to = goal.Position - r.Position
+            local spd = math.clamp(to.Magnitude * 3.2, 40, brain.capFly and brain.capFly(140) or 140)
+            local dir = to.Magnitude > 0.2 and to.Unit or Vector3.zero
+            pcall(function()
+                if #flyObjs > 0 and flyObjs[1] and flyObjs[1].Parent then
+                    local mover = flyObjs[1]
+                    if mover:IsA("LinearVelocity") then mover.VectorVelocity = dir * spd
+                    else mover.Velocity = dir * spd end
+                    local rot = flyObjs[2]
+                    if rot then
+                        local look = Vector3.new(goal.Position.X, r.Position.Y, goal.Position.Z)
+                        local ok, cf = pcall(function() return CFrame.lookAt(r.Position, look) end)
+                        if ok and cf then
+                            if rot:IsA("AlignOrientation") then rot.CFrame = cf else rot.CFrame = cf end
+                        end
+                    end
+                else
+                    -- no fly objects: CFrame step
+                    local step = r.Position + dir * math.min(4.5, dist - gap)
+                    local ok, cf = pcall(function()
+                        return CFrame.lookAt(step, Vector3.new(goal.Position.X, step.Y, goal.Position.Z))
+                    end)
+                    if ok and cf then r.CFrame = cf end
+                    r.AssemblyLinearVelocity = Vector3.zero
+                end
+            end)
+            ST.why = "flying in · " .. math.floor(dist) .. " studs"
+        else
+            -- glued
+            pcall(function()
+                r.CFrame = goal
+                r.AssemblyLinearVelocity = Vector3.zero
+                if #flyObjs > 0 and flyObjs[1] and flyObjs[1].Parent then
+                    local mover = flyObjs[1]
+                    if mover:IsA("LinearVelocity") then mover.VectorVelocity = Vector3.zero
+                    else mover.Velocity = Vector3.zero end
+                end
+            end)
+            ST.sticks += 1
+            ST.why = "stuck · " .. tostring(settings.atkStickPos or "Under")
+            local rate = math.clamp(tonumber(settings.atkStickRate) or 6, 1, 12)
+            if now() - lastFire >= (1 / rate) then
+                lastFire = now()
+                pcall(fireKit)
+            end
+        end
+    end
+    onHeartbeat("atkstick57e", function(dt)
+        if not wantActive() then
+            if ST.steering or ST.tempFly then
+                ST.steering = false
+                releaseTempFly()
+                ST.why = armed() and "waiting for attack" or "off"
+            end
+            ST.target, ST.root, ST.hum, ST.model = nil, nil, nil, nil
+            return
+        end
+        local ok, err = pcall(function()
+            local plr, model, humObj, root = pickPlayer()
+            if not root then
+                ST.steering = false
+                releaseTempFly()
+                ST.why = "no player in range"
+                ST.target, ST.root = nil, nil
+                return
+            end
+            ST.target, ST.model, ST.hum, ST.root = plr, model, humObj, root
+            local goal = slotCF(root)
+            local me = hrp()
+            if not (goal and me) then return end
+            local dist = (goal.Position - me.Position).Magnitude
+            steerTo(goal, dist)
+        end)
+        if not ok then
+            ST.steering = false
+            ST.why = "error"
+            CORE.log("WARN", "Attack Stick: " .. tostring(err))
+        end
+    end)
+    function ST.status()
+        if not armed() then return "off" end
+        local n = ST.target and ST.target.DisplayName or "-"
+        return ST.why .. " · " .. n .. " · M1 x" .. ST.clicks .. " · skills x" .. ST.skills .. " · kit " .. #ST.kit
+    end
+    onUnload(function()
+        ST.steering = false
+        releaseTempFly()
+    end)
+    CORE.log("BOOT", "Attack Stick online · temp fly · Under/Behind glue · M1+kit spam")
+end)
+
+
 -- =====================================================================
 -- 15. UI kit for pages
 -- =====================================================================
@@ -15753,6 +16110,7 @@ end
 -- 19. Start page
 -- =====================================================================
 GV.NEWS = {
+    {"5.7e", "Attack Stick: temp-fly to a player, glue Under/Behind them, spam M1 + discovered Z/X/C/V/F + bottom GUI skills."},
     {"5.7d", "Dodge only by default: Predictive Dodge ON · Stalker / Puppet Move / Auto-protect / Keep Distance OFF until you enable them."},
     {"5.7c", "SAFE BOOT: game no longer closes on start — silent aim hooks Mouse (not game.__index), Void Override namecall is lazy, Combat Aim OFF until you enable it."},
     {"5.7b", "Combat Aim crash fix: safe lookAt, silent-aim never throws, attack debounce, Enemies scan cached/capped — NPC M1 no longer kills the app."},
@@ -16348,6 +16706,23 @@ function H.buildDxlta(parent)
         K.slider(ca, "Aim range", "aimRange", 15, 150)
         K.slider(ca, "Aim FOV °", "aimFov", 40, 180)
         liveRow(ca, "Aim lock", function() return CORE.aim and CORE.aim.status and CORE.aim.status() or "loading…" end)
+        label(ca, {Size = UDim2.new(1, 0, 0, 48), Text = "Attack Stick: temp-fly to the nearest player (or Combat Aim lock), glue Under / Behind / Front, then spam M1 + discovered skills (keys + bottom GUI buttons).",
+            TextColor3 = C.sub, TextSize = 11, TextWrapped = true, LayoutOrder = K.nextOrder(), ZIndex = 4})
+        K.toggle(ca, "Attack Stick", "atkStick", function(on)
+            if on then
+                toast("Attack Stick on · flies in, sticks, spams M1 + skills", "shield", 3)
+            else
+                if CORE.stick then CORE.stick.steering = false end
+            end
+        end, "OFF by default · fly close + stick + attack spam")
+        K.cycle(ca, "Stick position", "atkStickPos", {"Under", "Behind", "Front"}, "Where you glue once close enough")
+        K.toggle(ca, "Only while attacking", "atkStickOnlyAtk", nil, "If ON: only sticks while you attack / hold a tool · if OFF: always chases in range")
+        K.toggle(ca, "Spam M1 / clicks", "atkStickSpam", nil, "Tool Activate + mouse1click / screen click")
+        K.toggle(ca, "Spam skills / GUI", "atkStickSkills", nil, "Z X C V F + other keys + bottom ability buttons it finds")
+        K.slider(ca, "Chase range", "atkStickRange", 20, 150)
+        K.slider(ca, "Stick gap", "atkStickGap", 2, 10)
+        K.slider(ca, "Spam rate", "atkStickRate", 2, 12)
+        liveRow(ca, "Attack Stick", function() return CORE.stick and CORE.stick.status and CORE.stick.status() or "loading…" end)
     end
 
     -- Protection
