@@ -5,7 +5,7 @@
     5.7d: dodge-only by default · distance keep opt-in
     5.7c: crash-safe boot
 
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/cursor/voidhub-live-ff0d/voidhub.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/refs/heads/cursor/voidhub-live-ff0d/voidhub.lua"))()
 ]]
 
 -- =====================================================================
