@@ -1,6 +1,6 @@
 --[[
-    DXLTA / Void Hub  v5.7g
-    Attack Stick: pick a player OR cycle all — script flies, sticks, hits (no mouse)
+    DXLTA / Void Hub  v5.7h
+    Quiet when safe: no spam chat/toasts, no unsolicited rescue teleports
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/refs/heads/cursor/voidhub-live-ff0d/voidhub.lua"))()
 ]]
@@ -39,7 +39,7 @@ ENV.__VoidHub = {}
 ENV.__SecretHub = ENV.__VoidHub -- legacy alias for older unloaders
 local HUB = ENV.__VoidHub
 HUB.tier = nil -- "free" | "premium" | nil (choose on Start)
-HUB.version = "5.7g"
+HUB.version = "5.7h"
 HUB.session = {dodges = 0, saves = 0, kills = 0, learned = 0, blocks = 0, started = os.clock()}
 
 -- =====================================================================
@@ -465,13 +465,14 @@ GV.DEFAULTS = {
     staffAction = "Notify", panicSafeSpot = true, accent = 5, particles = true, sounds = true,
     uiscale = 100, confirmRun = true, autoProfile = false, closeAfterRun = true,
     brainOn = true, brainLimit = true, autoProtect = false, threatEsp = true, hazardShield = false, autoHeal = false,
+    quietCalm = true,
     aggression = false, aggroNpc = true, aggroPvp = false, aggroOneShot = true, aggroSkills = true, aggroCombo = true,
     aggroLock = true, aggroRange = 20, aggroRate = 4,
     godmode = false, autododge = true, antigrab = false, antifreeze = false, radar = false, vfx = true,
     fxAura = false, fxAwaken = true, fxSixth = true, fxHeartbeat = true, fxBolt = true, fxHex = true, fxDomain = true,
     fxGodForm = true, voice = true, voiceTyping = false, voiceTaunts = true, voiceChat = true,
     npcdef = false, ghost = false, magnet = false, magnetRadius = 25,
-    handsOn = true, handsPuppet = false, handsRescue = true, handsLift = false, handsAlways = false, handsVisual = false, rescueThreshold = 35, npcEvade = false,
+    handsOn = true, handsPuppet = false, handsRescue = false, handsLift = false, handsAlways = false, handsVisual = false, rescueThreshold = 35, npcEvade = false,
     puppetMove = false, puppetStrength = 60, puppetStyle = "Duelist", catchFall = true, abilAssist = false, abilGui = false,
     stalker = false, stalkerSafe = false, keepDistance = false, fxSharingan = false, dbgVerbose = false,
     choreo = false, choreoReturn = true, aoeTele = false, finisher = false, finisherKey = "", finisherHp = 10, lootGrab = false,
@@ -510,7 +511,7 @@ if settings.v4 ~= true then settings.v4 = true settings.fxAura = false end
 -- 4.1 migration: the old "Godmode attempt" was health refill only; Guardian Godmode is a new system and starts off
 if settings.v41 ~= true then settings.v41 = true settings.godmode = false end
 -- V2.3 migration: the Lifeline replaces the old rescue; switch the rescue back on once (older builds could leave it off)
-if settings.v53 ~= true then settings.v53 = true settings.handsRescue = true end
+if settings.v53 ~= true then settings.v53 = true end -- rescue left to defaults / v57h (OFF unless user wants it)
 -- V2.5 / 5.5 / 5.7: hand models are gone for good — control stays, visuals never come back
 settings.handsVisual = false
 settings.handsPuppet = false
@@ -548,6 +549,16 @@ if settings.v57g ~= true then
     settings.atkStickPos = settings.atkStickPos or "Behind"
     settings.atkStickOnlyAtk = false
     settings.atkStickCycle = tonumber(settings.atkStickCycle) or 4
+end
+-- 5.7h: stay quiet + don't yank you away when nothing is hurting you
+if settings.v57h ~= true then
+    settings.v57h = true
+    settings.quietCalm = true
+    settings.handsRescue = false
+    settings.autoProtect = false
+    settings.keepDistance = false
+    settings.stalker = false
+    settings.kamui = false
 end
 settings.handsAlways = false
 settings.introHands = false
@@ -2669,7 +2680,7 @@ GV.PROFILE_KEYS = {"walkspeed", "jumppower", "fov", "gravity", "clock", "flyspee
     "ovrMirror", "ovrMarket",
     "combatAim", "aimCam", "aimBody", "aimSilent", "aimMove", "aimRange", "aimFov", "aimPlayers", "aimStick",
     "atkStick", "atkStickMode", "atkStickPos", "atkStickRange", "atkStickGap", "atkStickSpam", "atkStickSkills", "atkStickRate", "atkStickCycle",
-    "antiDeath", "quietDeath",
+    "antiDeath", "quietDeath", "quietCalm",
     "bfFruitNotify", "bfFruitEsp", "bfFruitSnipe", "bfChest", "bfFarm", "bfQuest", "bfStats", "bfStat", "bfWeapon", "bfBuso", "bfBusoVia", "bfKen", "bfSpeed"}
 local profiles = loadJSON(GV.PROFILE_FILE, {})
 if type(profiles) ~= "table" then profiles = {} end
@@ -3274,7 +3285,9 @@ CORE.safeModule("14g Guardian Brain", function()   -- own function scope: keeps 
         local closest = nearHazards[1]
         if closest and (closest.Position - r.Position).Magnitude < 8 and now() - lastHazardWarn > 6 and not settings.hazardShield then
             lastHazardWarn = now()
-            toast("Hazard close: " .. closest.Name, "warn", 2)
+            if not (settings.quietCalm ~= false and brain.isCalm and brain.isCalm()) then
+                toast("Hazard close: " .. closest.Name, "warn", 2)
+            end
         end
     end
 
@@ -3283,6 +3296,21 @@ CORE.safeModule("14g Guardian Brain", function()   -- own function scope: keeps 
     brain.threat = threat
     local function levelFor(score) if score >= 55 then return "Enemy" elseif score >= 20 then return "Watch" end return "Neutral" end
     function brain.levelOf(p) local t = threat[p] return t and t.level or "Neutral" end
+    function brain.isCalm()
+        if settings.quietCalm == false then return false end
+        local h = hum()
+        local lh = brain.lastHit
+        if type(lh) == "table" and (os.clock() - (lh.t or 0)) < 8 then return false end
+        if h and h.MaxHealth > 0 and h.Health / h.MaxHealth < 0.55 then return false end
+        if CORE.sense and CORE.sense.combat then return false end
+        local sit = brain.situation
+        if sit == "Combat" or sit == "Being chased" or sit == "Low health" then return false end
+        -- anyone who actually hit you recently?
+        for _, th in pairs(threat) do
+            if th and (os.clock() - (th.hitAt or 0)) < 8 then return false end
+        end
+        return true
+    end
     local function hostile(t) return t.level == "Enemy" or t.level == "Exploiter" end
     brain.hostile = hostile
     function brain.showThreat(p)
@@ -3361,7 +3389,14 @@ CORE.safeModule("14g Guardian Brain", function()   -- own function scope: keeps 
                 t.reasons = reasons
                 if t.level ~= "Neutral" then any = true end
                 if t.level == "Enemy" and prevLevel ~= "Enemy" and on() then
-                    if not say("threat", {name = p.DisplayName, why = reasons[1], player = p}, 2) then toast(p.DisplayName .. " looks hostile (" .. (reasons[1] or "threat") .. ")", "bad", 3) end
+                    local realHit = false
+                    for _, rr in ipairs(reasons) do
+                        if rr == "hit you" or rr == "attacked you before" then realHit = true break end
+                    end
+                    -- quiet games: don't announce "looks hostile" / chase vibes
+                    if realHit and not (brain.isCalm and brain.isCalm()) then
+                        if not say("threat", {name = p.DisplayName, why = reasons[1], player = p}, 2) then toast(p.DisplayName .. " hit you (" .. (reasons[1] or "threat") .. ")", "bad", 3) end
+                    end
                 end
             end
         end
@@ -3992,16 +4027,20 @@ CORE.safeModule("14g Guardian Brain", function()   -- own function scope: keeps 
                 local prevSit = brain.situation
                 brain.situation = sit
                 brain.strategy = STRATEGY[sit] or ""
-                local said = false
-                if sit == "Combat" then said = say("sit_combat")
-                elseif sit == "Being chased" then said = say("sit_chased", nil, 2)
-                elseif sit == "Low health" then said = say("sit_low", nil, 3)
-                elseif sit == "Hunting" then said = say("sit_hunt")
-                elseif sit == "Dominating" then said = say("sit_dominate", nil, 2)
-                elseif sit == "Obby" then said = say("sit_obby")
-                elseif sit == "Vehicle" then said = say("sit_vehicle")
-                elseif prevSit == "Combat" or prevSit == "Being chased" or prevSit == "Low health" or prevSit == "Hunting" or prevSit == "Dominating" then said = say("sit_clear") end
-                if not said and (sit == "Being chased" or sit == "Low health" or sit == "Dominating") then toast("Guardian: " .. sit .. " · " .. brain.strategy, "warn", 3) end
+                -- quiet when safe: no situation narration in peaceful games
+                local calm = settings.quietCalm ~= false and brain.isCalm and brain.isCalm()
+                if not calm then
+                    local said = false
+                    if sit == "Combat" then said = say("sit_combat")
+                    elseif sit == "Being chased" then said = say("sit_chased", nil, 2)
+                    elseif sit == "Low health" then said = say("sit_low", nil, 3)
+                    elseif sit == "Hunting" then said = say("sit_hunt")
+                    elseif sit == "Dominating" then said = say("sit_dominate", nil, 2)
+                    elseif sit == "Obby" then said = say("sit_obby")
+                    elseif sit == "Vehicle" then said = say("sit_vehicle")
+                    elseif prevSit == "Combat" or prevSit == "Being chased" or prevSit == "Low health" or prevSit == "Hunting" or prevSit == "Dominating" then said = say("sit_clear") end
+                    if not said and (sit == "Being chased" or sit == "Low health") then toast("Guardian: " .. sit .. " · " .. brain.strategy, "warn", 3) end
+                end
             end
             safeAcc += slowEvery
             if r and h and safeAcc >= 2 and h.FloorMaterial ~= Enum.Material.Air and h.Health >= h.MaxHealth * 0.6 and not FX.inSafe() then
@@ -5939,10 +5978,19 @@ CORE.safeModule("14j Guardian Voice", function()
         sit_low = true, recover = true, respawn = true, rescue_low = true, npcfail = true,
         grab_fail = true, hold_unsupported = true,
     }
+    local CALM_MUTE = {
+        sit_combat = true, sit_chased = true, sit_low = true, sit_hunt = true, sit_dominate = true,
+        sit_obby = true, sit_vehicle = true, sit_clear = true, threat = true, heal = true,
+        retreat = true, adjust = true, stalker_on = true, stalker_escape = true,
+        rescue_hit = true, rescue_low = true, dodge_pred = true,
+    }
     -- returns true when Voice took the message (callers can skip their toast)
     function VFX.say(kind, vars, prio, sub)
         if not enabled() then return false end
         if settings.quietDeath == true and QUIET_KINDS[kind] then return true end -- swallow, no toast fallback
+        if settings.quietCalm ~= false and CALM_MUTE[kind] and brain.isCalm and brain.isCalm() then
+            return true -- peaceful game: stay silent
+        end
         vars = vars or {}
         if kind == "threat" and vars.player then
             local dir, dist = direction(vars.player)
@@ -7906,12 +7954,11 @@ CORE.safeModule("14m Guardian Hands", function()
             local recent = last and (t - last.t) or 99
             local dps = recentDamage(1)
             local factor = (GAMEINFO and GAMEINFO.tune and tonumber(GAMEINFO.tune.rescueDpsFactor)) or 0.35
-            if last and recent < 1.5 and last.amt >= hp * 0.9 then reason = "hit"            -- one more hit like that kills you
-            elseif dps > 0 and dps * 0.6 >= hp then reason = "hit"                           -- the current damage rate kills you in < 0.6 s
+            if last and recent < 1.5 and last.amt >= hp * 0.9 then reason = "hit"
+            elseif dps > 0 and dps * 0.6 >= hp then reason = "hit"
             elseif hp <= mx * threshold() and recent < 2.5 then reason = "low"
             elseif dps >= mx * factor and hp < mx * 0.8 then reason = "hit"
-            elseif CORE.sense.top and (CORE.sense.top.danger or 0) >= 1 and (CORE.sense.top.lastAmt or 0) >= hp * 0.9 then
-                reason = "hit"   -- 4.1: this attacker is winding up and its last hit would kill you now: leave before it lands
+            -- no speculative "wind-up teleport" — that yanked people in peaceful games
             elseif recent < 1 then
                 castExclude()
                 local fl = workspace:Raycast(r.Position, Vector3.new(0, -6, 0), castP)
@@ -16059,6 +16106,7 @@ end
 -- 19. Start page
 -- =====================================================================
 GV.NEWS = {
+    {"5.7h", "Quiet when safe: no Guardian spam if nobody hurts you · Auto-Rescue/teleport OFF by default (turn Rescue on yourself if you want it)."},
     {"5.7g", "Attack Stick simple: Mode Cycle all / Pick one / Nearest — Prev/Next player buttons, script fly+stick+hits."},
     {"5.7f", "Attack Stick mobile-safe: script CFrame fly/stick, Tool:Activate + BF RegisterAttack/Hit, firesignal GUI — never mouse/phone taps."},
     {"5.7e", "Attack Stick: temp-fly to a player, glue Under/Behind them, spam M1 + discovered Z/X/C/V/F + bottom GUI skills."},
@@ -16699,6 +16747,7 @@ function H.buildDxlta(parent)
         if CORE.ggod and CORE.ggod.applyAntiDeath then CORE.ggod.applyAntiDeath() end
     end, "Default ON · holds Dead state, heal/Soft God, Safe Spot bail · OFF to respawn if stuck")
     K.toggle(df, "Quiet Death", "quietDeath", nil, "Default ON · mute death / fail / low-HP smug voice lines")
+    K.toggle(df, "Quiet when safe", "quietCalm", nil, "Default ON · no Guardian spam / threat talk when nobody is hurting you")
     label(df, {Size = UDim2.new(1, 0, 0, 40), Text = "Honest limit: Roblox servers own your HP. Anti-Death is the strongest client bypass (block Dead state + heal remotes + Safe Spot). It is not true immortality — if the server insists you're dead, toggle OFF to respawn.",
         TextColor3 = C.sub, TextSize = 11, TextWrapped = true, LayoutOrder = K.nextOrder(), ZIndex = 4})
     K.toggle(df, "Guardian Godmode", "godmode", function() FX.applyGodmode() end, "Avoidance-based: state guard, anti-knockback, anti-ragdoll, dodge, rescue, heal, anti-void")
@@ -17201,7 +17250,7 @@ function H.buildEffects(pg)
     K.toggle(ef, "Chat taunts", "voiceChat", nil, "Also posts verified taunts in public chat (playful lines only)")
     K.title(ef, "Guardian Control")
     K.toggle(ef, "Guardian Control", "handsOn", function(on) if not on and VFX.handsOff then VFX.handsOff() end end, "Guardian briefly moves you to save you · voice + Takeover · no hand models")
-    K.toggle(ef, "Lifeline Rescue", "handsRescue", nil, "On damage the Guardian flies YOU out of reach (high ground or the air) and keeps you away until you heal")
+    K.toggle(ef, "Lifeline Rescue", "handsRescue", nil, "OFF by default · only when YOU enable it · on real damage flies you out (high ground or the air) and keeps you away until you heal")
     K.toggle(ef, "Companion hold (NPCs)", "handsGrab", nil, "Hold the NPC that hurts you in the air, set it down far away · never players · no hand puppet")
     K.toggle(ef, "Water Guard", "waterGuard", nil, "Solid surface at sea level while Guardian Control is on (Blox Fruits sea) · Walk on Water still covers every game")
     K.slider(ef, "Lifeline starts at (% health)", "rescueStart", 20, 80, nil, 1)
