@@ -5,7 +5,7 @@
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/cursor/bf-panel-ff0d/panel.lua"))()
 
-    Toggle: RightShift  ·  Reopen: lime orb bottom-right
+    − = minimize (draggable orb)  ·  × = unload  ·  RightShift = toggle
 ]]
 
 print("[DXLTA] BF Panel boot…")
@@ -14,7 +14,7 @@ local ENV = (type(getgenv) == "function" and getgenv()) or _G
 if ENV.__DXLTA_BF_PANEL and type(ENV.__DXLTA_BF_PANEL.unload) == "function" then
     pcall(ENV.__DXLTA_BF_PANEL.unload)
 end
-ENV.__DXLTA_BF_PANEL = { version = "2.0" }
+ENV.__DXLTA_BF_PANEL = { version = "2.1" }
 local HUB = ENV.__DXLTA_BF_PANEL
 
 local okBoot, bootErr = xpcall(function()
@@ -101,9 +101,20 @@ local lastQuestTry = 0
 local lastBusoTry = 0
 local lastAuraNear = nil
 local lastFarmLogged = "idle"
+local lastCancelEquip = 0
 local killWatch = setmetatable({}, { __mode = "k" })
 local animHooks = {}
 local discoveredRemotes = {}
+-- Silent combat probe state (RegisterAttack / RegisterHit arg patterns)
+local combatProbe = {
+    attackOk = nil, -- "0.5" | "empty" | "M1" | "fail"
+    hitOk = nil, -- "model" | "hrp" | "hrp_table" | "hum" | "fail"
+    attackTried = {},
+    hitTried = {},
+    hpVerified = false,
+    lastHpCheck = 0,
+    useRemotes = true,
+}
 
 local RING_MAX = 100
 local ringLog = {}
@@ -293,13 +304,67 @@ local function getNetFolder()
     return modules and modules:FindFirstChild("Net")
 end
 
+local function getRemotesFolder()
+    return ReplicatedStorage:FindFirstChild("Remotes")
+end
+
 local function findCommF()
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local remotes = getRemotesFolder()
     local f = remotes and remotes:FindFirstChild("CommF_")
     if f and (f:IsA("RemoteFunction") or f.ClassName == "RemoteFunction") then
         return f
     end
+    -- fallback: CommF (no underscore) — confirmed present in scout dump
+    f = remotes and remotes:FindFirstChild("CommF")
+    if f and (f:IsA("RemoteFunction") or f.ClassName == "RemoteFunction") then
+        return f
+    end
     return nil
+end
+
+local function findRemoteByName(folder, name)
+    if not folder then
+        return nil
+    end
+    local direct = folder:FindFirstChild(name)
+    if direct then
+        return direct
+    end
+    -- Net children are often named "RE/RegisterHit"
+    local ok, kids = pcall(function()
+        return folder:GetChildren()
+    end)
+    if not ok or not kids then
+        return nil
+    end
+    local want = string.lower(name)
+    for _, c in ipairs(kids) do
+        local n = string.lower(c.Name)
+        if n == want or n == "re/" .. want or string.find(n, want, 1, true) then
+            return c
+        end
+    end
+    return nil
+end
+
+local function getRegisterAttack()
+    return findRemoteByName(getNetFolder(), "RE/RegisterAttack")
+        or findRemoteByName(getNetFolder(), "RegisterAttack")
+end
+
+local function getRegisterHit()
+    return findRemoteByName(getNetFolder(), "RE/RegisterHit")
+        or findRemoteByName(getNetFolder(), "RegisterHit")
+end
+
+local function getCancelEquipAnim()
+    return findRemoteByName(getNetFolder(), "RE/CancelEquipAnim")
+        or findRemoteByName(getNetFolder(), "CancelEquipAnim")
+end
+
+local function getBestQuestNPCRemote()
+    local remotes = getRemotesFolder()
+    return remotes and remotes:FindFirstChild("GetBestQuestNPC")
 end
 
 local function ringPush(msg)
@@ -987,6 +1052,38 @@ local function buildScoutHeader()
         end
     end
     table.insert(lines, "workspace.Enemies sample: " .. (#sample > 0 and table.concat(sample, ", ") or "(none)"))
+    -- Confirmed remotes + RegisterAttack/Hit probe results
+    local ra = getRegisterAttack()
+    local rh = getRegisterHit()
+    local gq = getBestQuestNPCRemote()
+    table.insert(lines, string.format(
+        "Combat remotes: RegisterAttack=%s  RegisterHit=%s  GetBestQuestNPC=%s  CommF_=%s",
+        ra and ra:GetFullName() or "MISSING",
+        rh and rh:GetFullName() or "MISSING",
+        gq and gq:GetFullName() or "MISSING",
+        findCommF() and findCommF():GetFullName() or "MISSING"
+    ))
+    local atkBits, hitBits = {}, {}
+    for k, v in pairs(combatProbe.attackTried) do
+        table.insert(atkBits, k .. "=" .. tostring(v))
+    end
+    for k, v in pairs(combatProbe.hitTried) do
+        table.insert(hitBits, k .. "=" .. tostring(v))
+    end
+    table.sort(atkBits)
+    table.sort(hitBits)
+    table.insert(lines, string.format(
+        "RegisterAttack probe: locked=%s  tried={%s}",
+        tostring(combatProbe.attackOk or "—"),
+        #atkBits > 0 and table.concat(atkBits, ", ") or "none"
+    ))
+    table.insert(lines, string.format(
+        "RegisterHit probe: locked=%s  HP-verify=%s  tried={%s}",
+        tostring(combatProbe.hitOk or "—"),
+        combatProbe.hpVerified and "YES" or "no",
+        #hitBits > 0 and table.concat(hitBits, ", ") or "none"
+    ))
+    table.insert(lines, "useRemotes=" .. tostring(combatProbe.useRemotes) .. "  (PlayAttackStartEffect skipped)")
     table.insert(lines, "----- RING LOG (tail) -----")
     local start = math.max(1, #ringLog - 40)
     for i = start, #ringLog do
@@ -1287,6 +1384,17 @@ local function equipMeleeTool()
                 pcall(function()
                     h:EquipTool(t)
                 end)
+                -- optional CancelEquipAnim after equip
+                if os.clock() - lastCancelEquip > 1.2 then
+                    lastCancelEquip = os.clock()
+                    local cancel = getCancelEquipAnim()
+                    if cancel then
+                        pcall(function()
+                            cancel:FireServer()
+                        end)
+                        ringPush("CancelEquipAnim after melee equip")
+                    end
+                end
                 return t
             end
         end
@@ -1306,29 +1414,155 @@ local function equipMeleeTool()
     return held
 end
 
-local function fireCombatRemotes()
-    local remotes = discoverCombatRemotes()
-    for _, rem in ipairs(remotes) do
-        pcall(function()
-            if rem:IsA("RemoteEvent") or rem:IsA("UnreliableRemoteEvent") then
-                rem:FireServer()
-            elseif rem:IsA("RemoteFunction") then
-                rem:InvokeServer()
-            end
-        end)
+local function markTried(bucket, label)
+    if not combatProbe[bucket][label] then
+        combatProbe[bucket][label] = "tried"
+        ringPush("probe " .. bucket .. " try " .. label)
     end
 end
 
-local function attackOnceSilent()
-    local tool = equipMeleeTool()
+local function markOk(bucket, label)
+    combatProbe[bucket][label] = "ok"
+    if bucket == "attackTried" then
+        combatProbe.attackOk = label
+    else
+        combatProbe.hitOk = label
+    end
+    ringPush("probe " .. bucket .. " OK → " .. label)
+end
+
+local function fireRegisterAttack()
+    local rem = getRegisterAttack()
+    if not rem then
+        return false
+    end
+    rememberRemote(rem)
+    local patterns = {
+        { id = "0.5", fn = function() rem:FireServer(0.5) end },
+        { id = "empty", fn = function() rem:FireServer() end },
+        { id = "M1", fn = function() rem:FireServer("M1") end },
+    }
+    -- Prefer known-good pattern
+    if combatProbe.attackOk and combatProbe.attackOk ~= "fail" then
+        for _, p in ipairs(patterns) do
+            if p.id == combatProbe.attackOk then
+                local ok = pcall(p.fn)
+                return ok
+            end
+        end
+    end
+    for _, p in ipairs(patterns) do
+        markTried("attackTried", p.id)
+        local ok, err = pcall(p.fn)
+        if ok then
+            markOk("attackTried", p.id)
+            return true
+        else
+            combatProbe.attackTried[p.id] = "err:" .. tostring(err):sub(1, 40)
+            ringPush("RegisterAttack " .. p.id .. " ERR " .. tostring(err):sub(1, 48))
+        end
+    end
+    combatProbe.attackOk = "fail"
+    return false
+end
+
+local function readEnemyHp(tg)
+    if not tg or not tg.hum then
+        return nil
+    end
+    local ok, hp = pcall(function()
+        return tg.hum.Health
+    end)
+    return ok and hp or nil
+end
+
+local hitProbeIndex = 1
+local hitProbeFailStreak = 0
+
+local function fireRegisterHit(tg)
+    local rem = getRegisterHit()
+    if not rem or not tg then
+        return false
+    end
+    rememberRemote(rem)
+    local model = tg.model
+    local hrp = tg.root
+    local hum = tg.hum
+    local patterns = {
+        { id = "model", fn = function() rem:FireServer(model) end },
+        { id = "hrp", fn = function() rem:FireServer(hrp) end },
+        { id = "hrp_table", fn = function() rem:FireServer({ hrp }) end },
+        { id = "hum", fn = function() rem:FireServer(hum) end },
+    }
+    local beforeHp = readEnemyHp(tg)
+
+    -- Locked + HP-verified → keep using it
+    if combatProbe.hpVerified and combatProbe.hitOk and combatProbe.hitOk ~= "fail" then
+        for _, p in ipairs(patterns) do
+            if p.id == combatProbe.hitOk then
+                return pcall(p.fn)
+            end
+        end
+    end
+
+    -- Rotate patterns until HP drop verifies (FireServer rarely errors client-side)
+    local idx = ((hitProbeIndex - 1) % #patterns) + 1
+    local p = patterns[idx]
+    markTried("hitTried", p.id)
+    local ok, err = pcall(p.fn)
+    if ok then
+        combatProbe.hitOk = p.id
+        combatProbe.hitTried[p.id] = "fired"
+        ringPush("RegisterHit fire " .. p.id)
+        if beforeHp and os.clock() - combatProbe.lastHpCheck > 0.9 then
+            combatProbe.lastHpCheck = os.clock()
+            local capturedId = p.id
+            local capturedBefore = beforeHp
+            task.delay(0.2, function()
+                local after = readEnemyHp(tg)
+                if after and after < capturedBefore - 0.5 then
+                    combatProbe.hpVerified = true
+                    combatProbe.hitOk = capturedId
+                    hitProbeFailStreak = 0
+                    ringPush(string.format(
+                        "HP-VERIFY OK hit=%s  %.0f→%.0f (−%.0f)",
+                        capturedId,
+                        capturedBefore,
+                        after,
+                        capturedBefore - after
+                    ))
+                else
+                    hitProbeFailStreak += 1
+                    if not combatProbe.hpVerified then
+                        hitProbeIndex += 1
+                        ringPush("HP-VERIFY miss on " .. capturedId .. " → next pattern")
+                    end
+                end
+            end)
+        end
+        -- advance for next probe until verified
+        if not combatProbe.hpVerified then
+            hitProbeIndex += 1
+        end
+        return true
+    end
+    combatProbe.hitTried[p.id] = "err:" .. tostring(err):sub(1, 40)
+    ringPush("RegisterHit " .. p.id .. " ERR " .. tostring(err):sub(1, 48))
+    hitProbeIndex += 1
+    if hitProbeFailStreak > 12 then
+        combatProbe.hitOk = "fail"
+    end
+    return false
+end
+
+local function attackFallbackActivate(tool)
     if tool then
         pcall(function()
             tool:Activate()
         end)
     end
-    pcall(fireCombatRemotes)
     local now = os.clock()
-    if now - lastClick > 0.08 then
+    if now - lastClick > 0.12 then
         lastClick = now
         pcall(function()
             if VirtualUser then
@@ -1339,7 +1573,46 @@ local function attackOnceSilent()
             end
         end)
     end
-    -- suppress swing visuals immediately
+end
+
+local function attackOnceSilent(optionalTarget)
+    -- 1) Equip Melee (ToolTip Melee)
+    local tool = equipMeleeTool()
+    local tg = optionalTarget
+    if not tg then
+        local range = math.clamp(tonumber(STATE.kaRange) or 22, 5, 60)
+        local filter = STATE.farm and farmTargetName or nil
+        tg = select(1, findNearestEnemy(range, filter))
+        if not tg and STATE.farm then
+            tg = select(1, findNearestEnemy(range, nil))
+        end
+    end
+
+    local usedRemote = false
+    if combatProbe.useRemotes and tg then
+        local hasAtk = getRegisterAttack() ~= nil
+        local hasHit = getRegisterHit() ~= nil
+        if not hasAtk and not hasHit then
+            combatProbe.useRemotes = false
+            ringPush("Register* remotes MISSING · fallback Tool:Activate")
+        else
+            -- Prefer RegisterAttack → RegisterHit (skip PlayAttackStartEffect visuals)
+            local atk = hasAtk and fireRegisterAttack() or false
+            local hit = hasHit and fireRegisterHit(tg) or false
+            usedRemote = atk or hit
+            if not usedRemote and combatProbe.attackOk == "fail" and combatProbe.hitOk == "fail" then
+                combatProbe.useRemotes = false
+                ringPush("Register* remotes failed · fallback Tool:Activate")
+            end
+        end
+    end
+
+    -- Fallback Activate only if remotes missing/failed
+    if not usedRemote then
+        attackFallbackActivate(tool)
+    end
+
+    -- Suppress swing visuals (AnimationPlayed stop) — never rely on PlayAttackStartEffect
     stopAttackTracks()
     task.defer(stopAttackTracks)
 end
@@ -1460,7 +1733,7 @@ local function killAuraTick()
         pullNearbyMobs(tg.root.Position, range + 25)
     end
     watchKill(tg)
-    attackOnceSilent()
+    attackOnceSilent(tg)
 end
 
 -- ── Quests (Sea 1) ──────────────────────────────────────────────────────────
@@ -1563,6 +1836,27 @@ local function firePromptsNear(model)
     return fired
 end
 
+local function tryGetBestQuestNPC()
+    local rf = getBestQuestNPCRemote()
+    if not rf then
+        return nil
+    end
+    rememberRemote(rf)
+    local ok, res = pcall(function()
+        return rf:InvokeServer()
+    end)
+    if not ok then
+        ringPush("GetBestQuestNPC ERR " .. tostring(res):sub(1, 48))
+        return nil
+    end
+    local brief = tostring(res)
+    if #brief > 72 then
+        brief = brief:sub(1, 69) .. "…"
+    end
+    ringPush("GetBestQuestNPC → " .. brief)
+    return res
+end
+
 local function tryAutoQuest()
     if not STATE.autoQuest then
         return
@@ -1571,6 +1865,35 @@ local function tryAutoQuest()
         return
     end
     lastQuestTry = os.clock()
+
+    -- Prefer GetBestQuestNPC when present (level-aware giver pick)
+    local best = tryGetBestQuestNPC()
+    if best ~= nil then
+        if typeof(best) == "Instance" then
+            local root = getHRP(best) or (best:IsA("BasePart") and best)
+            if root then
+                local r = localRoot()
+                local dist = r and (r.Position - root.Position).Magnitude or 999
+                if dist > 14 then
+                    travelTo(root.Position + Vector3.new(0, 3, 0), "best quest NPC", function()
+                        return STATE.autoQuest == true
+                    end)
+                end
+                firePromptsNear(best:IsA("Model") and best or best.Parent)
+                ST.farm = "bestNPC @ " .. best.Name
+            end
+        elseif type(best) == "string" and best ~= "" then
+            -- some builds return quest name string
+            invokeComm("StartQuest", best, 1)
+        elseif type(best) == "table" then
+            local qName = best[1] or best.Name or best.Quest or best.quest
+            local qId = best[2] or best.Id or best.id or 1
+            if qName then
+                invokeComm("StartQuest", tostring(qName), tonumber(qId) or 1)
+            end
+        end
+    end
+
     local plan = questPlan()
     if plan then
         ringPush("quest try " .. tostring(plan[2]) .. " #" .. tostring(plan[3]) .. " → " .. tostring(plan[4]))
@@ -1583,7 +1906,8 @@ local function tryAutoQuest()
         end
         ringPush("quest CommF_ failed · fallback prompt")
     else
-        ringPush("quest: no plan for level")
+        -- High seas / unknown PlaceId (e.g. 79091703265657): no hard-fail — farm nearest works
+        ringPush("quest: no Sea1 plan · sea=" .. seaLabel() .. " · farm nearest")
     end
     local giver, dist = findQuestGiver()
     if giver then
@@ -1597,7 +1921,7 @@ local function tryAutoQuest()
         ST.farm = "prompt @ " .. giver.Name
         ringPush("quest prompt @ " .. giver.Name)
     else
-        ringPush("quest: no giver found")
+        ringPush("quest: no giver · continue nearest farm")
     end
 end
 
@@ -1637,13 +1961,16 @@ local function farmStep()
         return
     end
     ST.nearest = string.format("%s · %dm", tg.name, math.floor(d or 0))
+    -- Pin above/behind mob ~4–8 studs
     local away = flat(r.Position - tg.root.Position)
     away = away.Magnitude > 0.1 and away.Unit or Vector3.new(0, 0, 1)
-    local spot = tg.root.Position + away * 4
-    if d > 10 then
+    local behind = 6
+    local above = 5
+    local spot = tg.root.Position + away * behind + Vector3.new(0, above, 0)
+    if d > 12 then
         pin = nil
         ST.farm = "travel → " .. tg.name
-        travelTo(spot + Vector3.new(0, 1, 0), tg.name, function()
+        travelTo(spot, tg.name, function()
             return STATE.farm == true and tg.hum.Health > 0 and tg.model.Parent ~= nil and (localHum() and localHum().Health > 0)
         end)
         return
@@ -1663,6 +1990,11 @@ local function farmStep()
         if not hh or hh.Health <= 0 then
             break
         end
+        -- refresh pin as mob moves
+        away = flat(r.Position - tg.root.Position)
+        away = away.Magnitude > 0.1 and away.Unit or Vector3.new(0, 0, 1)
+        spot = tg.root.Position + away * behind + Vector3.new(0, above, 0)
+        pin = { pos = spot, root = tg.root, untilT = os.clock() + 2.5 }
         local look = Vector3.new(tg.root.Position.X, spot.Y, tg.root.Position.Z)
         pcall(function()
             local rr = localRoot()
@@ -1670,7 +2002,7 @@ local function farmStep()
                 rr.CFrame = safeLookAt(spot, look)
             end
         end)
-        attackOnceSilent()
+        attackOnceSilent(tg)
         task.wait(1 / rate)
     end
 end
@@ -1713,24 +2045,31 @@ screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screen.DisplayOrder = 1000
 screen.Parent = guiParent
 
--- Mobile-first: ~92% width, ~78% max height, centered
+-- Phone: max ~88% × 62%, centered — no full-bleed wash behind panel
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
-panel.Size = UDim2.new(0.92, 0, 0.78, 0)
+panel.Size = UDim2.fromScale(0.88, 0.62)
 panel.Position = UDim2.fromScale(0.5, 0.5)
 panel.BackgroundColor3 = COLORS.panel
 panel.BorderSizePixel = 0
 panel.ClipsDescendants = true
 panel.Parent = screen
 
+do
+    local lim = Instance.new("UISizeConstraint")
+    lim.MaxSize = Vector2.new(520, 560)
+    lim.MinSize = Vector2.new(280, 320)
+    lim.Parent = panel
+end
+
 local panelCorner = Instance.new("UICorner")
-panelCorner.CornerRadius = UDim.new(0, 14)
+panelCorner.CornerRadius = UDim.new(0, 12)
 panelCorner.Parent = panel
 
 local panelStroke = Instance.new("UIStroke")
 panelStroke.Color = COLORS.limeDim
-panelStroke.Thickness = 1.5
+panelStroke.Thickness = 1.25
 panelStroke.Parent = panel
 
 local panelGrad = Instance.new("UIGradient")
@@ -1741,54 +2080,74 @@ panelGrad.Color = ColorSequence.new({
 panelGrad.Rotation = 110
 panelGrad.Parent = panel
 
--- Header bar (compact — brand lives on Start tab)
+-- Header bar — brand + (− minimize) (× unload) side by side top-right
 local header = Instance.new("Frame")
 header.Name = "Header"
-header.Size = UDim2.new(1, 0, 0, 44)
+header.Size = UDim2.new(1, 0, 0, 42)
 header.BackgroundColor3 = COLORS.bg
 header.BorderSizePixel = 0
 header.Parent = panel
 
 local headerCorner = Instance.new("UICorner")
-headerCorner.CornerRadius = UDim.new(0, 14)
+headerCorner.CornerRadius = UDim.new(0, 12)
 headerCorner.Parent = header
 
 local headerFix = Instance.new("Frame")
-headerFix.Size = UDim2.new(1, 0, 0, 16)
-headerFix.Position = UDim2.new(0, 0, 1, -16)
+headerFix.Size = UDim2.new(1, 0, 0, 14)
+headerFix.Position = UDim2.new(0, 0, 1, -14)
 headerFix.BackgroundColor3 = COLORS.bg
 headerFix.BorderSizePixel = 0
 headerFix.Parent = header
 
 local headerBrand = Instance.new("TextLabel")
 headerBrand.BackgroundTransparency = 1
-headerBrand.Position = UDim2.fromOffset(14, 8)
-headerBrand.Size = UDim2.new(1, -70, 0, 28)
+headerBrand.Position = UDim2.fromOffset(12, 7)
+headerBrand.Size = UDim2.new(1, -96, 0, 28)
 headerBrand.Font = Enum.Font.GothamBlack
-headerBrand.TextSize = 18
+headerBrand.TextSize = 17
 headerBrand.TextXAlignment = Enum.TextXAlignment.Left
 headerBrand.TextColor3 = COLORS.lime
 headerBrand.Text = "DXLTA"
 headerBrand.Parent = header
 
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.fromOffset(36, 32)
-closeBtn.Position = UDim2.new(1, -46, 0, 6)
-closeBtn.BackgroundColor3 = COLORS.panelAlt
-closeBtn.TextColor3 = COLORS.danger
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 16
-closeBtn.Text = "×"
-closeBtn.AutoButtonColor = true
-closeBtn.Parent = header
-do
+local headerBtns = Instance.new("Frame")
+headerBtns.Name = "HeaderBtns"
+headerBtns.AnchorPoint = Vector2.new(1, 0)
+headerBtns.Position = UDim2.new(1, -8, 0, 5)
+headerBtns.Size = UDim2.fromOffset(76, 32)
+headerBtns.BackgroundTransparency = 1
+headerBtns.Parent = header
+
+local headerBtnLay = Instance.new("UIListLayout")
+headerBtnLay.FillDirection = Enum.FillDirection.Horizontal
+headerBtnLay.HorizontalAlignment = Enum.HorizontalAlignment.Right
+headerBtnLay.VerticalAlignment = Enum.VerticalAlignment.Center
+headerBtnLay.Padding = UDim.new(0, 4)
+headerBtnLay.SortOrder = Enum.SortOrder.LayoutOrder
+headerBtnLay.Parent = headerBtns
+
+local function makeHeaderBtn(text, color, order)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.fromOffset(34, 30)
+    btn.BackgroundColor3 = COLORS.panelAlt
+    btn.TextColor3 = color
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 18
+    btn.Text = text
+    btn.AutoButtonColor = true
+    btn.LayoutOrder = order
+    btn.Parent = headerBtns
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, 8)
-    c.Parent = closeBtn
+    c.Parent = btn
+    return btn
 end
 
+local minBtn = makeHeaderBtn("−", COLORS.text, 1)
+local closeBtn = makeHeaderBtn("×", COLORS.danger, 2)
+
 -- Bottom category tabs
-local TAB_H = 54
+local TAB_H = 48
 local tabBar = Instance.new("Frame")
 tabBar.Name = "Tabs"
 tabBar.Size = UDim2.new(1, 0, 0, TAB_H)
@@ -1798,7 +2157,7 @@ tabBar.BorderSizePixel = 0
 tabBar.Parent = panel
 
 local tabBarTop = Instance.new("Frame")
-tabBarTop.Size = UDim2.new(1, 0, 0, 12)
+tabBarTop.Size = UDim2.new(1, 0, 0, 10)
 tabBarTop.BackgroundColor3 = COLORS.bg
 tabBarTop.BorderSizePixel = 0
 tabBarTop.Parent = tabBar
@@ -1807,7 +2166,7 @@ local tabLayout = Instance.new("UIListLayout")
 tabLayout.FillDirection = Enum.FillDirection.Horizontal
 tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-tabLayout.Padding = UDim.new(0, 4)
+tabLayout.Padding = UDim.new(0, 3)
 tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 tabLayout.Parent = tabBar
 
@@ -1819,8 +2178,8 @@ tabPad.Parent = tabBar
 
 local contentHost = Instance.new("Frame")
 contentHost.Name = "Content"
-contentHost.Size = UDim2.new(1, -12, 1, -(44 + TAB_H + 8))
-contentHost.Position = UDim2.fromOffset(6, 48)
+contentHost.Size = UDim2.new(1, -16, 1, -(42 + TAB_H + 6))
+contentHost.Position = UDim2.fromOffset(8, 44)
 contentHost.BackgroundTransparency = 1
 contentHost.ClipsDescendants = true
 contentHost.Parent = panel
@@ -1873,18 +2232,18 @@ end
 for i, meta in ipairs(TABS) do
     local btn = Instance.new("TextButton")
     btn.Name = "Tab_" .. meta.id
-    btn.Size = UDim2.new(0.19, 0, 0, 42)
+    btn.Size = UDim2.new(0.185, 0, 0, 36)
     btn.BackgroundColor3 = COLORS.panelAlt
     btn.TextColor3 = COLORS.muted
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
+    btn.TextSize = 12
     btn.Text = meta.label
     btn.AutoButtonColor = true
     btn.LayoutOrder = i
     btn.Parent = tabBar
     do
         local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 10)
+        c.CornerRadius = UDim.new(0, 8)
         c.Parent = btn
     end
     tabButtons[meta.id] = btn
@@ -1905,15 +2264,15 @@ for i, meta in ipairs(TABS) do
     page.Parent = contentHost
 
     local lay = Instance.new("UIListLayout")
-    lay.Padding = UDim.new(0, 8)
+    lay.Padding = UDim.new(0, 10)
     lay.SortOrder = Enum.SortOrder.LayoutOrder
     lay.Parent = page
 
     local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0, 4)
-    pad.PaddingBottom = UDim.new(0, 12)
+    pad.PaddingTop = UDim.new(0, 2)
+    pad.PaddingBottom = UDim.new(0, 14)
     pad.PaddingLeft = UDim.new(0, 2)
-    pad.PaddingRight = UDim.new(0, 2)
+    pad.PaddingRight = UDim.new(0, 4)
     pad.Parent = page
 
     tabPages[meta.id] = page
@@ -1945,7 +2304,7 @@ end
 
 local function makeToggle(tab, label, key, onChange, opts)
     opts = opts or {}
-    local h = opts.giant and 64 or 48
+    local h = opts.giant and 58 or 44
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, h)
     row.BackgroundColor3 = opts.giant and Color3.fromRGB(28, 40, 22) or COLORS.panelAlt
@@ -1954,37 +2313,37 @@ local function makeToggle(tab, label, key, onChange, opts)
     row.Parent = parentOf(tab)
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
+    corner.CornerRadius = UDim.new(0, 9)
     corner.Parent = row
 
     if opts.giant then
         local stroke = Instance.new("UIStroke")
         stroke.Color = COLORS.limeDim
-        stroke.Thickness = 1.5
+        stroke.Thickness = 1.25
         stroke.Parent = row
     end
 
     local text = Instance.new("TextLabel")
     text.BackgroundTransparency = 1
-    text.Position = UDim2.fromOffset(14, 0)
-    text.Size = UDim2.new(1, -90, 1, 0)
+    text.Position = UDim2.fromOffset(12, 0)
+    text.Size = UDim2.new(1, -82, 1, 0)
     text.Font = opts.giant and Enum.Font.GothamBlack or Enum.Font.GothamMedium
-    text.TextSize = opts.giant and 18 or 14
+    text.TextSize = opts.giant and 17 or 13
     text.TextXAlignment = Enum.TextXAlignment.Left
     text.TextColor3 = COLORS.text
     text.Text = label
     text.Parent = row
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.fromOffset(opts.giant and 72 or 58, opts.giant and 36 or 30)
-    btn.Position = UDim2.new(1, opts.giant and -84 or -70, 0.5, opts.giant and -18 or -15)
+    btn.Size = UDim2.fromOffset(opts.giant and 64 or 54, opts.giant and 32 or 28)
+    btn.Position = UDim2.new(1, opts.giant and -74 or -64, 0.5, opts.giant and -16 or -14)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = opts.giant and 14 or 13
+    btn.TextSize = opts.giant and 13 or 12
     btn.AutoButtonColor = true
     btn.Parent = row
     do
         local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 8)
+        c.CornerRadius = UDim.new(0, 7)
         c.Parent = btn
     end
 
@@ -2019,7 +2378,7 @@ local function makeToggle(tab, label, key, onChange, opts)
     -- whole row touchable
     local hit = Instance.new("TextButton")
     hit.BackgroundTransparency = 1
-    hit.Size = UDim2.new(1, -90, 1, 0)
+    hit.Size = UDim2.new(1, -82, 1, 0)
     hit.Text = ""
     hit.ZIndex = 2
     hit.Parent = row
@@ -2217,7 +2576,7 @@ do
         if busoToggleUI then busoToggleUI.paint() end
     end, { giant = true })
 
-    makeTip("Start", "Spiel 1–2 Min → Clipboard hier pasten (Auto-Scout kopiert alle 3s).", 48)
+    makeTip("Start", "Scout auto-copy alle 3s → Clipboard hier pasten.", 36)
 
     sectionLabel("Start", "LIVE STATUS")
     makeLive("Start", "Level", "level")
@@ -2228,12 +2587,13 @@ do
     makeLive("Start", "Busy / Stun", "busy")
     makeLive("Start", "HasBuso", "buso")
 
-    makeTip("Start", "RightShift = Panel · Lime-Orb unten rechts = wieder öffnen", 40)
+    makeTip("Start", "− = minimize (Orb ziehen) · × = unload · RightShift = toggle", 40)
 end
 
 -- ═══ FARM TAB ═══════════════════════════════════════════════════════════════
 
-farmToggleUI = makeToggle("Farm", "Auto Farm / Auto Level", "farm", function(on)
+sectionLabel("Farm", "CORE")
+farmToggleUI = makeToggle("Farm", "Auto Farm", "farm", function(on)
     if not on then
         pin = nil
         stopTravel()
@@ -2250,27 +2610,29 @@ farmToggleUI = makeToggle("Farm", "Auto Farm / Auto Level", "farm", function(on)
     end
 end)
 
-questToggleUI = makeToggle("Farm", "Auto Quest (CommF_ / Prompt)", "autoQuest", function(on)
+questToggleUI = makeToggle("Farm", "Auto Quest", "autoQuest", function(on)
     ringPush(on and "auto quest ON" or "auto quest OFF")
 end)
 
-busoToggleUI = makeToggle("Farm", "Auto Buso (J / CommF_)", "autoBuso", function(on)
+busoToggleUI = makeToggle("Farm", "Auto Buso", "autoBuso", function(on)
     ringPush(on and "auto buso ON" or "auto buso OFF")
     if on then
         tryAutoBuso()
     end
 end)
 
-makeToggle("Farm", "Mob Pull (network owner)", "mobPull", function(on)
+sectionLabel("Farm", "EXTRA")
+makeToggle("Farm", "Mob Pull", "mobPull", function(on)
     ringPush(on and "mob pull ON" or "mob pull OFF")
 end)
 
-makeSlider("Farm", "Tween / Farm speed", "bfSpeed", 50, 300)
-makeTip("Farm", "Tween nur intern zum Mob — kein freies Fly.", 36)
+makeSlider("Farm", "Tween speed", "bfSpeed", 50, 300)
+makeTip("Farm", "Pin 4–8 studs over mob · nearest Enemies always · unknown sea OK.", 40)
 
 -- ═══ KAMPF TAB ══════════════════════════════════════════════════════════════
 
-auraToggleUI = makeToggle("Kampf", "Kill Aura (Silent M1)", "killAura", function(on)
+sectionLabel("Kampf", "SILENT AURA")
+auraToggleUI = makeToggle("Kampf", "Kill Aura (RegisterHit)", "killAura", function(on)
     lastAuraNear = nil
     ringPush(on and "kill aura ON" or "kill aura OFF")
     if on then
@@ -2284,11 +2646,12 @@ end)
 
 makeSlider("Kampf", "Aura range", "kaRange", 5, 60)
 makeSlider("Kampf", "Attack rate", "kaRate", 1, 14)
-makeTip("Kampf", "Melee equip · face target · Activate · Attack-Anims gestoppt. Steht still-ish am Farm-Pin.", 56)
+makeTip("Kampf", "Melee → RegisterAttack → RegisterHit · Anims gestoppt · Activate nur Fallback.", 48)
 
 -- ═══ ESP TAB ════════════════════════════════════════════════════════════════
 
-makeToggle("ESP", "Gegner ESP (Enemies)", "enemyEsp", function(on)
+sectionLabel("ESP", "OVERLAYS")
+makeToggle("ESP", "Gegner ESP", "enemyEsp", function(on)
     if not on then
         for model in pairs(enemyEspMap) do
             clearEspOn(model)
@@ -2299,7 +2662,7 @@ makeToggle("ESP", "Gegner ESP (Enemies)", "enemyEsp", function(on)
     end
 end)
 
-makeToggle("ESP", "NPC ESP (optional)", "npcEsp", function(on)
+makeToggle("ESP", "NPC ESP", "npcEsp", function(on)
     if not on then
         for model in pairs(npcEspMap) do
             clearEspOn(model)
@@ -2310,7 +2673,7 @@ makeToggle("ESP", "NPC ESP (optional)", "npcEsp", function(on)
     end
 end)
 
-makeToggle("ESP", "Spieler ESP (optional)", "playerEsp", function(on)
+makeToggle("ESP", "Spieler ESP", "playerEsp", function(on)
     if not on then
         for model in pairs(playerEspMap) do
             clearEspOn(model)
@@ -2323,14 +2686,15 @@ end)
 
 -- ═══ SCOUT TAB ══════════════════════════════════════════════════════════════
 
-makeToggle("Scout", "Auto-Copy Scout (3s)", "scoutAutoCopy", function(on)
+sectionLabel("Scout", "AUTO + DUMP")
+makeToggle("Scout", "Auto-Copy (3s)", "scoutAutoCopy", function(on)
     ringPush(on and "scout auto-copy ON" or "scout auto-copy OFF")
     if on then
         doAutoCopyScout()
     end
 end)
 
-makeTip("Scout", "Alle 3s: Farm-State, nearest, CommF_, Remotes, Busy/Stun, Level, PlaceId → Clipboard.", 52)
+makeTip("Scout", "Alle 3s Status + RegisterAttack/Hit Probe + HP-Verify → Clipboard.", 44)
 
 scoutFilterBox = Instance.new("TextBox")
 scoutFilterBox.Name = "ScoutFilter"
@@ -2502,7 +2866,7 @@ end)
 
 switchTab("Start")
 
--- ── Reopen orb ──────────────────────────────────────────────────────────────
+-- ── Minimize orb (~44px, draggable) ─────────────────────────────────────────
 
 local orb = Instance.new("ScreenGui")
 orb.Name = ORB_NAME
@@ -2512,14 +2876,15 @@ orb.DisplayOrder = 1001
 orb.Enabled = false
 orb.Parent = guiParent
 
+local ORB_SIZE = 44
 local orbBtn = Instance.new("TextButton")
 orbBtn.Name = "Orb"
-orbBtn.Size = UDim2.fromOffset(52, 52)
-orbBtn.Position = UDim2.new(1, -72, 1, -72)
+orbBtn.Size = UDim2.fromOffset(ORB_SIZE, ORB_SIZE)
+orbBtn.Position = UDim2.new(1, -(ORB_SIZE + 16), 1, -(ORB_SIZE + 16))
 orbBtn.BackgroundColor3 = COLORS.lime
 orbBtn.TextColor3 = COLORS.ink
 orbBtn.Font = Enum.Font.GothamBlack
-orbBtn.TextSize = 15
+orbBtn.TextSize = 13
 orbBtn.Text = "DX"
 orbBtn.AutoButtonColor = true
 orbBtn.Parent = orb
@@ -2539,14 +2904,68 @@ local function setPanelVisible(vis)
     orb.Enabled = not vis
 end
 
-closeBtn.MouseButton1Click:Connect(function()
+-- − = minimize (hide panel, show draggable orb)
+minBtn.MouseButton1Click:Connect(function()
     setPanelVisible(false)
-end)
-orbBtn.MouseButton1Click:Connect(function()
-    setPanelVisible(true)
+    ringPush("panel minimized")
 end)
 
--- Drag panel by header
+-- × = full unload / destroy
+closeBtn.MouseButton1Click:Connect(function()
+    ringPush("panel unload via ×")
+    pcall(function()
+        HUB.unload()
+    end)
+end)
+
+-- Orb: drag around; click (no drag) restores panel
+do
+    local dragging = false
+    local moved = false
+    local dragStart
+    local originAbs
+    local DRAG_THRESH = 8
+    local function clampOrb(x, y)
+        local cam = Workspace.CurrentCamera
+        local vs = cam and cam.ViewportSize or Vector2.new(800, 600)
+        return math.clamp(x, 4, math.max(4, vs.X - ORB_SIZE - 4)),
+            math.clamp(y, 4, math.max(4, vs.Y - ORB_SIZE - 4))
+    end
+    track(orbBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            moved = false
+            dragStart = input.Position
+            originAbs = orbBtn.AbsolutePosition
+        end
+    end))
+    track(UserInputService.InputChanged:Connect(function(input)
+        if not dragging or not orb.Enabled then
+            return
+        end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            if math.abs(delta.X) > DRAG_THRESH or math.abs(delta.Y) > DRAG_THRESH then
+                moved = true
+            end
+            if moved and originAbs then
+                local nx, ny = clampOrb(originAbs.X + delta.X, originAbs.Y + delta.Y)
+                orbBtn.Position = UDim2.fromOffset(nx, ny)
+            end
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging and not moved and orb.Enabled then
+                setPanelVisible(true)
+            end
+            dragging = false
+            moved = false
+        end
+    end))
+end
+
+-- Drag panel by header (not the − / × buttons)
 do
     local dragging = false
     local dragStart, startPos
@@ -2583,7 +3002,9 @@ track(UserInputService.InputBegan:Connect(function(input, gp)
         return
     end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        setPanelVisible(not STATE.panelVisible)
+        if panel.Parent then
+            setPanelVisible(not STATE.panelVisible)
+        end
     end
 end))
 
@@ -2755,8 +3176,8 @@ screen.Destroying:Connect(function()
     pcall(HUB.unload)
 end)
 
-notify("DXLTA", "BF Panel v2 · RightShift · FAST FARM", 4)
-print("[DXLTA] BF Panel ready — panel.lua v2 mobile loaded")
+notify("DXLTA", "BF Panel v2.1 · − minimize · × unload · FAST FARM", 4)
+print("[DXLTA] BF Panel ready — panel.lua v2.1 mobile + RegisterHit")
 
 end, debug.traceback)
 
