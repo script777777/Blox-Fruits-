@@ -1,8 +1,6 @@
 --[[
-    DXLTA / Void Hub  v5.7f
-    Renamed from secrethub.lua — live copy for script777777/Blox-Fruits-
-    5.7f: Attack Stick mobile-safe — NO mouse/VIM clicks; script CFrame fly + Tool:Activate + BF remotes
-    5.7e/d/c: stick / dodge-only / crash-safe boot
+    DXLTA / Void Hub  v5.7g
+    Attack Stick: pick a player OR cycle all — script flies, sticks, hits (no mouse)
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/refs/heads/cursor/voidhub-live-ff0d/voidhub.lua"))()
 ]]
@@ -41,7 +39,7 @@ ENV.__VoidHub = {}
 ENV.__SecretHub = ENV.__VoidHub -- legacy alias for older unloaders
 local HUB = ENV.__VoidHub
 HUB.tier = nil -- "free" | "premium" | nil (choose on Start)
-HUB.version = "5.7f"
+HUB.version = "5.7g"
 HUB.session = {dodges = 0, saves = 0, kills = 0, learned = 0, blocks = 0, started = os.clock()}
 
 -- =====================================================================
@@ -489,8 +487,8 @@ GV.DEFAULTS = {
     ovrMirror = false, ovrMarket = false,
     combatAim = false, aimCam = true, aimBody = true, aimSilent = false, aimMove = false,
     aimRange = 80, aimFov = 180, aimPlayers = true, aimStick = true,
-    atkStick = false, atkStickPos = "Under", atkStickRange = 90, atkStickGap = 3.2,
-    atkStickSpam = true, atkStickSkills = true, atkStickOnlyAtk = false, atkStickRate = 6,
+    atkStick = false, atkStickMode = "Cycle", atkStickPos = "Behind", atkStickRange = 120, atkStickGap = 3.5,
+    atkStickSpam = true, atkStickSkills = true, atkStickRate = 8, atkStickCycle = 4,
     antiDeath = true, quietDeath = true,
     bfFruitNotify = true, bfFruitEsp = false, bfFruitSnipe = false, bfChest = false, bfFarm = false, bfQuest = false, bfStats = false,
     bfStat = "Melee", bfWeapon = "Melee", bfBuso = false, bfBusoVia = "J key", bfKen = false, bfSpeed = 150,
@@ -543,6 +541,13 @@ if settings.v57d ~= true then
     settings.autoProtect = false
     settings.keepDistance = false
     settings.npcEvade = false
+end
+if settings.v57g ~= true then
+    settings.v57g = true
+    settings.atkStickMode = settings.atkStickMode or "Cycle"
+    settings.atkStickPos = settings.atkStickPos or "Behind"
+    settings.atkStickOnlyAtk = false
+    settings.atkStickCycle = tonumber(settings.atkStickCycle) or 4
 end
 settings.handsAlways = false
 settings.introHands = false
@@ -2663,7 +2668,7 @@ GV.PROFILE_KEYS = {"walkspeed", "jumppower", "fov", "gravity", "clock", "flyspee
     "ovrHitbox", "ovrHitboxAmp", "ovrParasite", "ovrCdStrip", "ovrSoftGod", "ovrDominion", "ovrMaps", "voidSiphon",
     "ovrMirror", "ovrMarket",
     "combatAim", "aimCam", "aimBody", "aimSilent", "aimMove", "aimRange", "aimFov", "aimPlayers", "aimStick",
-    "atkStick", "atkStickPos", "atkStickRange", "atkStickGap", "atkStickSpam", "atkStickSkills", "atkStickOnlyAtk", "atkStickRate",
+    "atkStick", "atkStickMode", "atkStickPos", "atkStickRange", "atkStickGap", "atkStickSpam", "atkStickSkills", "atkStickRate", "atkStickCycle",
     "antiDeath", "quietDeath",
     "bfFruitNotify", "bfFruitEsp", "bfFruitSnipe", "bfChest", "bfFarm", "bfQuest", "bfStats", "bfStat", "bfWeapon", "bfBuso", "bfBusoVia", "bfKen", "bfSpeed"}
 local profiles = loadJSON(GV.PROFILE_FILE, {})
@@ -14900,166 +14905,160 @@ end)
 
 
 
+
 -- =====================================================================
--- 14aa Attack Stick 5.7f — MOBILE-SAFE script combat
---   • Fly / stick = pure CFrame (no VirtualUser / mouse / screen taps)
---   • M1 = Tool:Equip + Tool:Activate (+ Blox Fruits RegisterAttack/Hit)
---   • Skills = other tools Activate + firesignal on GUI buttons (no phone cursor)
+-- 14aa Attack Stick 5.7g — SIMPLE
+--   Mode: Cycle (all players in turn) | Pick (one you choose) | Nearest
+--   Script CFrame fly → stick Behind/Under/Front → Tool:Activate + BF remotes
+--   No mouse / no phone taps.
 -- =====================================================================
 CORE.safeModule("14aa Attack Stick", function()
     local ST = {
-        steering = false, target = nil, root = nil, hum = nil, model = nil,
+        steering = false, target = nil, root = nil, hum = nil, model = nil, pick = nil,
         why = "off", sticks = 0, hits = 0, skills = 0, kit = {}, kitT = -10, bfNet = nil,
+        cycleIdx = 1, cycleSince = 0, list = {},
     }
     CORE.stick = ST
     local firesignal = exfn("firesignal")
     local getconnections = exfn("getconnections")
-    local ABI = CORE.abil
     local function now() return os.clock() end
     local function armed()
-        return alive and settings.atkStick == true and settings.brainOn ~= false
+        return alive and settings.atkStick == true
     end
-    local function wantActive()
-        if not armed() then return false end
-        if settings.atkStickOnlyAtk == true then
-            local SEN = CORE.sense
-            if SEN and SEN.userAttacking and SEN.userAttacking(1.2) then return true end
-            local c = char()
-            if c and c:FindFirstChildOfClass("Tool") then return true end
-            return false
+    local function alivePlayers()
+        local out = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and p.Character then
+                local h = p.Character:FindFirstChildOfClass("Humanoid")
+                local r = p.Character:FindFirstChild("HumanoidRootPart") or p.Character.PrimaryPart
+                if h and r and h.Health > 0 then
+                    if not (guardian.staff and guardian.staff[p.UserId]) then
+                        out[#out + 1] = {plr = p, model = p.Character, hum = h, root = r}
+                    end
+                end
+            end
         end
-        return true
+        return out
+    end
+    function ST.refreshList()
+        ST.list = alivePlayers()
+        return ST.list
+    end
+    function ST.nextPick(dir)
+        local list = ST.refreshList()
+        if #list == 0 then ST.pick = nil toast("No players.", "warn", 2) return end
+        local idx = 1
+        if ST.pick then
+            for i, e in ipairs(list) do if e.plr == ST.pick then idx = i break end end
+        end
+        idx = ((idx - 1 + (dir or 1) - 1) % #list) + 1
+        ST.pick = list[idx].plr
+        toast("Target: " .. ST.pick.DisplayName, "ok", 2)
+        settings.atkStickMode = "Pick"
+        saveSettings()
+        if K.toggles and K.refreshToggles then pcall(K.refreshToggles) end
     end
     local function bfRemotes()
         if ST.bfNet ~= nil then return ST.bfNet end
         local pack = {ok = false}
         pcall(function()
             local rs = game:GetService("ReplicatedStorage")
-            local mods = rs:FindFirstChild("Modules")
-            local netMod = mods and mods:FindFirstChild("Net")
+            local netMod = rs:FindFirstChild("Modules") and rs.Modules:FindFirstChild("Net")
             if netMod then
                 local net = require(netMod)
-                local function re(name)
-                    if type(net) == "table" and type(net.RemoteEvent) == "function" then
-                        local ok, ev = pcall(function() return net:RemoteEvent(name) end)
-                        if ok then return ev end
-                    end
-                    return nil
+                if type(net) == "table" and type(net.RemoteEvent) == "function" then
+                    local okA, a = pcall(function() return net:RemoteEvent("RegisterAttack") end)
+                    local okH, h = pcall(function() return net:RemoteEvent("RegisterHit") end)
+                    if okA then pack.atk = a end
+                    if okH then pack.hit = h end
                 end
-                pack.atk = re("RegisterAttack")
-                pack.hit = re("RegisterHit")
             end
             if not (pack.atk and pack.hit) then
                 for _, d in ipairs(rs:GetDescendants()) do
                     if d:IsA("RemoteEvent") then
-                        local n = d.Name
-                        if (n == "RegisterAttack" or string.find(n, "RegisterAttack", 1, true)) and not pack.atk then pack.atk = d end
-                        if (n == "RegisterHit" or string.find(n, "RegisterHit", 1, true)) and not pack.hit then pack.hit = d end
+                        if string.find(d.Name, "RegisterAttack", 1, true) then pack.atk = pack.atk or d end
+                        if string.find(d.Name, "RegisterHit", 1, true) then pack.hit = pack.hit or d end
                     end
                 end
             end
             pack.ok = pack.atk ~= nil and pack.hit ~= nil
         end)
         ST.bfNet = pack
-        if pack.ok then CORE.log("BOOT", "Attack Stick · BF RegisterAttack/Hit ready") end
         return pack
     end
     local function slotCF(root)
-        if not root then return nil end
-        local mode = tostring(settings.atkStickPos or "Under")
+        local mode = tostring(settings.atkStickPos or "Behind")
         local ok, cf = pcall(function()
-            if mode == "Behind" then return root.CFrame * CFrame.new(0, 1.0, 4.5)
-            elseif mode == "Front" then return root.CFrame * CFrame.new(0, 1.0, -3.8) end
-            return root.CFrame * CFrame.new(0, -5.0, 0.2)
+            if mode == "Under" then return root.CFrame * CFrame.new(0, -5, 0)
+            elseif mode == "Front" then return root.CFrame * CFrame.new(0, 1, -4) end
+            return root.CFrame * CFrame.new(0, 1.2, 4.5) -- Behind
         end)
         return ok and cf or nil
     end
-    local function pickPlayer()
-        local AIM = CORE.aim
-        if AIM and AIM.model and AIM.root and AIM.root.Parent and AIM.hum and AIM.hum.Health > 0 then
-            local plr = Players:GetPlayerFromCharacter(AIM.model)
-            if plr and plr ~= LP then return plr, AIM.model, AIM.hum, AIM.root end
-        end
+    local function pickTarget()
+        local list = ST.refreshList()
+        if #list == 0 then return nil end
+        local mode = tostring(settings.atkStickMode or "Cycle")
         local me = hrp()
-        if not me then return nil end
-        local range = math.clamp(tonumber(settings.atkStickRange) or 90, 15, 200)
-        local best, bd, bm, bh, br
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LP and p.Character then
-                local h = p.Character:FindFirstChildOfClass("Humanoid")
-                local r = p.Character:FindFirstChild("HumanoidRootPart") or p.Character.PrimaryPart
-                if h and r and h.Health > 0 and not (guardian.staff and guardian.staff[p.UserId]) then
-                    local d = (r.Position - me.Position).Magnitude
-                    if d <= range and (not bd or d < bd) then best, bd, bm, bh, br = p, d, p.Character, h, r end
+        local range = math.clamp(tonumber(settings.atkStickRange) or 120, 20, 300)
+
+        if mode == "Pick" then
+            if ST.pick then
+                for _, e in ipairs(list) do
+                    if e.plr == ST.pick then
+                        if me and (e.root.Position - me.Position).Magnitude <= range then return e end
+                    end
                 end
             end
+            -- no valid pick: keep nil (UI shows pick someone)
+            return nil
         end
-        if not best then return nil end
-        return best, bm, bh, br
+
+        if mode == "Nearest" then
+            local best, bd
+            for _, e in ipairs(list) do
+                local d = me and (e.root.Position - me.Position).Magnitude or 0
+                if d <= range and (not bd or d < bd) then best, bd = e, d end
+            end
+            return best
+        end
+
+        -- Cycle: rotate every atkStickCycle seconds, or when target dies
+        local cycleSec = math.clamp(tonumber(settings.atkStickCycle) or 4, 1, 20)
+        if ST.cycleSince == 0 then ST.cycleSince = now() end
+        -- filter in range preferred, else all
+        local pool = {}
+        for _, e in ipairs(list) do
+            local d = me and (e.root.Position - me.Position).Magnitude or 0
+            if d <= range then pool[#pool + 1] = e end
+        end
+        if #pool == 0 then pool = list end
+        if ST.target then
+            local still = false
+            for _, e in ipairs(pool) do if e.plr == ST.target then still = true break end end
+            if not still or (now() - ST.cycleSince) >= cycleSec then
+                ST.cycleIdx = (ST.cycleIdx % #pool) + 1
+                ST.cycleSince = now()
+            else
+                for i, e in ipairs(pool) do if e.plr == ST.target then ST.cycleIdx = i break end end
+            end
+        else
+            ST.cycleIdx = ((ST.cycleIdx - 1) % #pool) + 1
+            ST.cycleSince = now()
+        end
+        return pool[((ST.cycleIdx - 1) % #pool) + 1]
     end
-    local function isFruitish(tl)
+    local function isJunk(tl)
         if not tl then return true end
         if GV.isFruitItem and GV.isFruitItem(tl) then return true end
         local n = string.lower(tostring(tl.Name))
         return string.find(n, "heal", 1, true) or string.find(n, "food", 1, true)
     end
-    local function rebuildKit(force)
-        if not force and now() - ST.kitT < 2 then return end
-        ST.kitT = now()
-        local out, seen = {}, {}
-        local function push(e)
-            if not e or not e.id or seen[e.id] then return end
-            seen[e.id] = true
-            out[#out + 1] = e
-        end
-        push({id = "M1", kind = "m1", label = "M1"})
-        push({id = "BFHIT", kind = "bfhit", label = "BF Hit"})
-        local function addTool(tl)
-            if not (tl and tl:IsA("Tool")) or isFruitish(tl) then return end
-            push({id = "tool:" .. tl.Name, kind = "tool", label = tl.Name, ref = tl})
-        end
-        local bp = LP:FindFirstChildOfClass("Backpack")
-        if bp then for _, tl in ipairs(bp:GetChildren()) do addTool(tl) end end
-        local c = char()
-        if c then for _, tl in ipairs(c:GetChildren()) do addTool(tl) end end
-        if ABI and ABI.list then
-            for _, a in ipairs(ABI.list) do
-                if a.kind == "attack" and a.src == "tool" and a.ref then
-                    push({id = "tool:" .. a.label, kind = "tool", label = a.label, ref = a.ref})
-                elseif a.kind == "attack" and a.src == "gui" and a.ref then
-                    push({id = "gui:" .. a.label, kind = "gui", label = a.label, ref = a.ref})
-                end
-            end
-        end
-        local pg = LP:FindFirstChildOfClass("PlayerGui")
-        if pg then
-            local cam = workspace.CurrentCamera
-            local vh = (cam and cam.ViewportSize.Y) or 800
-            local n = 0
-            for _, d in ipairs(pg:GetDescendants()) do
-                n += 1
-                if n > 4000 then break end
-                if d:IsA("GuiButton") and d.Visible and d.AbsoluteSize.X >= 24 and d.AbsoluteSize.Y >= 24 then
-                    local y = d.AbsolutePosition.Y + d.AbsoluteSize.Y * 0.5
-                    if y >= vh * 0.50 then
-                        local txt = string.lower(tostring(d.Name) .. " " .. ((d:IsA("TextButton") and d.Text) or ""))
-                        local skip = string.find(txt, "shop", 1, true) or string.find(txt, "setting", 1, true)
-                            or string.find(txt, "inventory", 1, true) or string.find(txt, "close", 1, true)
-                            or string.find(txt, "menu", 1, true) or string.find(txt, "chat", 1, true)
-                        if not skip then
-                            push({id = "gui:" .. d:GetFullName(), kind = "gui", label = (d:IsA("TextButton") and d.Text ~= "" and d.Text) or d.Name, ref = d})
-                        end
-                    end
-                end
-            end
-        end
-        ST.kit = out
-    end
-    local function equipCombatTool()
+    local function equipWeapon()
         local c, h = char(), hum()
         if not (c and h) then return nil end
         local tl = c:FindFirstChildOfClass("Tool")
-        if tl and not isFruitish(tl) then return tl end
+        if tl and not isJunk(tl) then return tl end
         if CORE.pickWeapon then
             local w = CORE.pickWeapon()
             if w then pcall(function() h:EquipTool(w) end) return w end
@@ -15067,172 +15066,136 @@ CORE.safeModule("14aa Attack Stick", function()
         local bp = LP:FindFirstChildOfClass("Backpack")
         if bp then
             for _, t in ipairs(bp:GetChildren()) do
-                if t:IsA("Tool") and not isFruitish(t) then
-                    pcall(function() h:EquipTool(t) end)
-                    return t
+                if t:IsA("Tool") and not isJunk(t) then pcall(function() h:EquipTool(t) end) return t end
+            end
+        end
+        return nil
+    end
+    local function hit(humTarget)
+        local tl = equipWeapon()
+        if tl then pcall(function() tl:Activate() end) ST.hits += 1 end
+        local net = bfRemotes()
+        if net and net.ok and humTarget then
+            pcall(function() if net.atk then net.atk:FireServer(0.5) end end)
+            pcall(function() if net.hit then net.hit:FireServer(humTarget, {}) end end)
+            ST.hits += 1
+        elseif CORE.pve and CORE.pve.m1 then
+            pcall(CORE.pve.m1)
+        end
+        if settings.atkStickSkills == false then return end
+        -- rotate other backpack tools once in a while
+        local bp = LP:FindFirstChildOfClass("Backpack")
+        local c, h = char(), hum()
+        if bp and c and h and now() % 1.2 < 0.15 then
+            for _, t in ipairs(bp:GetChildren()) do
+                if t:IsA("Tool") and not isJunk(t) and t ~= tl then
+                    pcall(function() h:EquipTool(t) t:Activate() end)
+                    ST.skills += 1
+                    break
                 end
             end
         end
-        return c:FindFirstChildOfClass("Tool")
-    end
-    local function scriptM1(humTarget)
-        local tl = equipCombatTool()
-        local okTool = false
-        if tl then okTool = pcall(function() tl:Activate() end) end
-        if okTool then ST.hits += 1 end
-        local net = bfRemotes()
-        if net and net.ok and humTarget then
-            pcall(function()
-                if net.atk then
-                    if typeof(net.atk) == "Instance" then net.atk:FireServer(0.5)
-                    else pcall(function() net.atk:FireServer(0.5) end) end
-                end
-            end)
-            pcall(function()
-                if net.hit then
-                    if typeof(net.hit) == "Instance" then net.hit:FireServer(humTarget, {})
-                    else pcall(function() net.hit:FireServer(humTarget, {}) end) end
-                end
-            end)
-            ST.hits += 1
-            return true
-        end
-        if CORE.pve and CORE.pve.m1 then pcall(CORE.pve.m1) end
-        return okTool
-    end
-    local function fireGuiScript(b)
-        if not (b and b.Parent) then return false end
-        if firesignal then
-            local ok1 = pcall(firesignal, b.Activated)
-            local ok2 = pcall(firesignal, b.MouseButton1Click)
-            if ok1 or ok2 then ST.skills += 1 return true end
-        end
-        if getconnections then
-            local fired = false
-            for _, sigName in ipairs({"Activated", "MouseButton1Click", "MouseButton1Down"}) do
-                local ok, conns = pcall(function() return getconnections(b[sigName]) end)
-                if ok and type(conns) == "table" then
-                    for _, c in ipairs(conns) do
-                        if c.Function then if pcall(c.Function) then fired = true end
-                        elseif c.Fire then pcall(c.Fire, c) fired = true end
+        -- firesignal a couple bottom GUI buttons (script, no cursor)
+        if firesignal or getconnections then
+            local pg = LP:FindFirstChildOfClass("PlayerGui")
+            local cam = workspace.CurrentCamera
+            local vh = (cam and cam.ViewportSize.Y) or 800
+            if pg then
+                local n, fired = 0, 0
+                for _, d in ipairs(pg:GetDescendants()) do
+                    n += 1
+                    if n > 2500 or fired >= 2 then break end
+                    if d:IsA("GuiButton") and d.Visible and d.AbsoluteSize.X >= 28 then
+                        local y = d.AbsolutePosition.Y + d.AbsoluteSize.Y * 0.5
+                        if y >= vh * 0.55 then
+                            local ok = false
+                            if firesignal then
+                                ok = pcall(firesignal, d.Activated) or pcall(firesignal, d.MouseButton1Click)
+                            elseif getconnections then
+                                local okC, conns = pcall(function() return getconnections(d.Activated) end)
+                                if okC and conns then for _, c0 in ipairs(conns) do if c0.Function and pcall(c0.Function) then ok = true end end end
+                            end
+                            if ok then fired += 1 ST.skills += 1 end
+                        end
                     end
                 end
             end
-            if fired then ST.skills += 1 return true end
-        end
-        if type(b.Activate) == "function" then
-            local ok = pcall(function() b:Activate() end)
-            if ok then ST.skills += 1 end
-            return ok
-        end
-        return false
-    end
-    local kitIdx, lastFire = 1, -10
-    local function fireKit(humTarget)
-        if settings.atkStickSpam ~= false then scriptM1(humTarget) end
-        if settings.atkStickSkills == false then return end
-        rebuildKit(false)
-        local n = #ST.kit
-        if n == 0 then return end
-        for _ = 1, math.min(4, n) do
-            kitIdx = (kitIdx % n) + 1
-            local e = ST.kit[kitIdx]
-            if not e then break end
-            if e.kind == "m1" or e.kind == "bfhit" then
-                scriptM1(humTarget)
-            elseif e.kind == "tool" and e.ref then
-                local h, c = hum(), char()
-                if h and c and e.ref.Parent then
-                    pcall(function()
-                        if e.ref.Parent ~= c then h:EquipTool(e.ref) end
-                        e.ref:Activate()
-                    end)
-                    ST.skills += 1
-                end
-            elseif e.kind == "gui" then
-                fireGuiScript(e.ref)
-            end
         end
     end
-    local function steerTo(goal, dist, humTarget)
+    local lastHit = -10
+    local function go(goal, dist, humTarget)
         local r = hrp()
         if not (r and goal) then return end
-        local gap = math.clamp(tonumber(settings.atkStickGap) or 3.2, 1.5, 12)
         ST.steering = true
-        if dist > gap + 1.2 then
+        local gap = math.clamp(tonumber(settings.atkStickGap) or 3.5, 1.5, 12)
+        if dist > gap + 1 then
+            -- aggressive script fly: big CFrame steps (works on phone)
             local to = goal.Position - r.Position
-            local stepLen = math.clamp(dist * 0.35, 6, 28)
-            local dir = to.Magnitude > 0.15 and to.Unit or Vector3.zero
-            local step = r.Position + dir * math.min(stepLen, math.max(dist - gap, 0.5))
+            local step = math.clamp(dist * 0.55, 10, 55)
+            local dir = to.Magnitude > 0.1 and to.Unit or Vector3.zero
+            local pos = r.Position + dir * math.min(step, dist - gap * 0.5)
             pcall(function()
-                local look = Vector3.new(goal.Position.X, step.Y, goal.Position.Z)
-                local ok, cf = pcall(function()
-                    if (look - step).Magnitude < 0.2 then return CFrame.new(step) end
-                    return CFrame.lookAt(step, look)
-                end)
-                if ok and cf then r.CFrame = cf end
+                local look = Vector3.new(goal.Position.X, pos.Y, goal.Position.Z)
+                if (look - pos).Magnitude < 0.2 then r.CFrame = CFrame.new(pos)
+                else r.CFrame = CFrame.lookAt(pos, look) end
                 r.AssemblyLinearVelocity = Vector3.zero
-                r.AssemblyAngularVelocity = Vector3.zero
             end)
             if brain.ownMove then pcall(brain.ownMove) end
-            ST.why = "script-fly · " .. math.floor(dist) .. " studs"
-            local rate = math.clamp(tonumber(settings.atkStickRate) or 6, 1, 12)
-            if dist < 28 and now() - lastFire >= (1 / rate) then
-                lastFire = now()
-                pcall(fireKit, humTarget)
+            ST.why = "flying → " .. (ST.target and ST.target.DisplayName or "?") .. " · " .. math.floor(dist)
+            if dist < 40 and settings.atkStickSpam ~= false and now() - lastHit > 0.12 then
+                lastHit = now()
+                hit(humTarget)
             end
         else
             pcall(function()
                 r.CFrame = goal
                 r.AssemblyLinearVelocity = Vector3.zero
-                r.AssemblyAngularVelocity = Vector3.zero
             end)
             if brain.ownMove then pcall(brain.ownMove) end
             ST.sticks += 1
-            ST.why = "stuck · " .. tostring(settings.atkStickPos or "Under") .. " · script hits"
-            local rate = math.clamp(tonumber(settings.atkStickRate) or 6, 1, 12)
-            if now() - lastFire >= (1 / math.max(rate, 1)) then
-                lastFire = now()
-                pcall(fireKit, humTarget)
+            ST.why = "ON " .. tostring(settings.atkStickPos) .. " · " .. (ST.target and ST.target.DisplayName or "?")
+            local rate = math.clamp(tonumber(settings.atkStickRate) or 8, 2, 14)
+            if settings.atkStickSpam ~= false and now() - lastHit >= 1 / rate then
+                lastHit = now()
+                hit(humTarget)
             end
         end
     end
-    onHeartbeat("atkstick57f", function()
-        if not wantActive() then
-            if ST.steering then ST.steering = false ST.why = armed() and "waiting" or "off" end
-            ST.target, ST.root, ST.hum, ST.model = nil, nil, nil, nil
+    onHeartbeat("atkstick57g", function()
+        if not armed() then
+            ST.steering = false
+            ST.why = "off"
+            ST.target = nil
             return
         end
         local ok, err = pcall(function()
-            local plr, model, humObj, root = pickPlayer()
-            if not root then
+            local e = pickTarget()
+            if not e then
                 ST.steering = false
-                ST.why = "no player in range"
-                ST.target, ST.root = nil, nil
+                ST.why = (settings.atkStickMode == "Pick") and "Pick a player (Prev/Next)" or "no players"
+                ST.target, ST.root, ST.hum = nil, nil, nil
                 return
             end
-            ST.target, ST.model, ST.hum, ST.root = plr, model, humObj, root
-            local goal = slotCF(root)
+            ST.target, ST.model, ST.hum, ST.root = e.plr, e.model, e.hum, e.root
+            local goal = slotCF(e.root)
             local me = hrp()
             if not (goal and me) then return end
-            steerTo(goal, (goal.Position - me.Position).Magnitude, humObj)
+            go(goal, (goal.Position - me.Position).Magnitude, e.hum)
         end)
-        if not ok then
-            ST.steering = false
-            ST.why = "error"
-            CORE.log("WARN", "Attack Stick: " .. tostring(err))
-        end
+        if not ok then ST.steering = false ST.why = "error" CORE.log("WARN", "Attack Stick: " .. tostring(err)) end
     end)
     function ST.status()
         if not armed() then return "off" end
-        local n = ST.target and ST.target.DisplayName or "-"
-        local bf = (ST.bfNet and ST.bfNet.ok) and " · BF remotes" or ""
-        return ST.why .. " · " .. n .. " · hits x" .. ST.hits .. " · skills x" .. ST.skills .. bf
+        local mode = tostring(settings.atkStickMode or "Cycle")
+        local n = ST.target and ST.target.DisplayName or (ST.pick and ST.pick.DisplayName) or "-"
+        return mode .. " · " .. ST.why .. " · " .. n .. " · hits " .. ST.hits
     end
     onUnload(function() ST.steering = false end)
     task.defer(bfRemotes)
-    CORE.log("BOOT", "Attack Stick 5.7f · script CFrame fly · Tool:Activate · no mouse/phone taps")
+    CORE.log("BOOT", "Attack Stick 5.7g · Cycle / Pick / Nearest · simple script fly")
 end)
+
+
 
 
 
@@ -16096,6 +16059,7 @@ end
 -- 19. Start page
 -- =====================================================================
 GV.NEWS = {
+    {"5.7g", "Attack Stick simple: Mode Cycle all / Pick one / Nearest — Prev/Next player buttons, script fly+stick+hits."},
     {"5.7f", "Attack Stick mobile-safe: script CFrame fly/stick, Tool:Activate + BF RegisterAttack/Hit, firesignal GUI — never mouse/phone taps."},
     {"5.7e", "Attack Stick: temp-fly to a player, glue Under/Behind them, spam M1 + discovered Z/X/C/V/F + bottom GUI skills."},
     {"5.7d", "Dodge only by default: Predictive Dodge ON · Stalker / Puppet Move / Auto-protect / Keep Distance OFF until you enable them."},
@@ -16693,23 +16657,27 @@ function H.buildDxlta(parent)
         K.slider(ca, "Aim range", "aimRange", 15, 150)
         K.slider(ca, "Aim FOV °", "aimFov", 40, 180)
         liveRow(ca, "Aim lock", function() return CORE.aim and CORE.aim.status and CORE.aim.status() or "loading…" end)
-        label(ca, {Size = UDim2.new(1, 0, 0, 56), Text = "Attack Stick (Handy-safe): Script fliegt/klebt per CFrame — KEIN Mausklick. M1 = Tool:Activate + BF RegisterAttack/Hit. Skills = Tools + firesignal auf GUI (kein Phone-Cursor).",
+        label(ca, {Size = UDim2.new(1, 0, 0, 44), Text = "Attack Stick: AN → Script fliegt zum Ziel, klebt, schlägt (Tool + BF Remotes). Mode Cycle = alle abwechselnd · Pick = einer mit Prev/Next · Nearest = nächster.",
             TextColor3 = C.sub, TextSize = 11, TextWrapped = true, LayoutOrder = K.nextOrder(), ZIndex = 4})
         K.toggle(ca, "Attack Stick", "atkStick", function(on)
             if on then
-                toast("Attack Stick on · script fly + stick + Tool/BF hits (no mouse)", "shield", 3.5)
+                toast("Attack Stick AN · " .. tostring(settings.atkStickMode or "Cycle"), "shield", 3)
             else
                 if CORE.stick then CORE.stick.steering = false end
             end
-        end, "OFF by default · script-only · no phone taps")
-        K.cycle(ca, "Stick position", "atkStickPos", {"Under", "Behind", "Front"}, "Where you glue once close enough")
-        K.toggle(ca, "Only while attacking", "atkStickOnlyAtk", nil, "If ON: only while you attack / hold a tool · if OFF: always chases")
-        K.toggle(ca, "Spam M1 (script)", "atkStickSpam", nil, "Tool:Activate + BF RegisterAttack/Hit — never mouse")
-        K.toggle(ca, "Spam skills (script)", "atkStickSkills", nil, "Other tools + firesignal on GUI — never mouse")
-        K.slider(ca, "Chase range", "atkStickRange", 20, 150)
-        K.slider(ca, "Stick gap", "atkStickGap", 2, 10)
-        K.slider(ca, "Spam rate", "atkStickRate", 2, 12)
-        liveRow(ca, "Attack Stick", function() return CORE.stick and CORE.stick.status and CORE.stick.status() or "loading…" end)
+        end, "Einfach AN machen")
+        K.cycle(ca, "Ziel-Mode", "atkStickMode", {"Cycle", "Pick", "Nearest"}, "Cycle = alle abwechselnd · Pick = ausgewählter Spieler · Nearest = nächster")
+        K.actions(ca, "Spieler wählen", {
+            {"Prev", function() if CORE.stick and CORE.stick.nextPick then CORE.stick.nextPick(-1) end end, 72},
+            {"Next", function() if CORE.stick and CORE.stick.nextPick then CORE.stick.nextPick(1) end end, 72},
+        }, "Für Mode Pick: Ziel durchschalten")
+        K.cycle(ca, "Kleben wo", "atkStickPos", {"Behind", "Under", "Front"}, "Behind = hinter dem Spieler")
+        K.toggle(ca, "Schlagen (M1/BF)", "atkStickSpam", nil, "Tool:Activate + RegisterAttack/Hit")
+        K.toggle(ca, "Skills mitnehmen", "atkStickSkills", nil, "Andere Tools + GUI-Buttons per Script")
+        K.slider(ca, "Range", "atkStickRange", 30, 250)
+        K.slider(ca, "Sekunden / Spieler", "atkStickCycle", 2, 12)
+        K.slider(ca, "Schlag-Tempo", "atkStickRate", 3, 14)
+        liveRow(ca, "Attack Stick", function() return CORE.stick and CORE.stick.status and CORE.stick.status() or "…" end)
     end
 
     -- Protection
