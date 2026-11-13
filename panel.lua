@@ -1,8 +1,7 @@
 --[[
-    DXLTA Blox Fruits — Hub Panel
-    Obsidian + acid lime · BF tools from Explorer dump paths
-    (workspace.Enemies / Characters / NPCs, RS.Modules.Net, Busy/Stun/Energy/HasBuso)
-    Scout · Erweitern: SCAN / COPY Dump / COPY Logs / COPY Status (in-panel)
+    DXLTA Blox Fruits — Mobile Hub Panel
+    Acid lime + obsidian · Nur BF: Farm · Silent Aura · Quest · Buso · ESP · Scout
+    Tabs: Start · Farm · Kampf · ESP · Scout
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/cursor/bf-panel-ff0d/panel.lua"))()
 
@@ -15,21 +14,22 @@ local ENV = (type(getgenv) == "function" and getgenv()) or _G
 if ENV.__DXLTA_BF_PANEL and type(ENV.__DXLTA_BF_PANEL.unload) == "function" then
     pcall(ENV.__DXLTA_BF_PANEL.unload)
 end
-ENV.__DXLTA_BF_PANEL = { version = "1.2" }
+ENV.__DXLTA_BF_PANEL = { version = "2.0" }
 local HUB = ENV.__DXLTA_BF_PANEL
 
 local okBoot, bootErr = xpcall(function()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local StarterGui = game:GetService("StarterGui")
+local VirtualInputManager
 local VirtualUser
 pcall(function() VirtualUser = game:GetService("VirtualUser") end)
+pcall(function() VirtualInputManager = game:GetService("VirtualInputManager") end)
 
 local LocalPlayer = Players.LocalPlayer
 while not LocalPlayer do
@@ -38,35 +38,36 @@ while not LocalPlayer do
 end
 
 local COLORS = {
-    bg = Color3.fromRGB(10, 12, 16),
-    panel = Color3.fromRGB(16, 20, 26),
-    panelAlt = Color3.fromRGB(22, 28, 36),
-    border = Color3.fromRGB(38, 46, 56),
-    text = Color3.fromRGB(220, 228, 235),
-    muted = Color3.fromRGB(130, 142, 158),
+    bg = Color3.fromRGB(8, 10, 12),
+    panel = Color3.fromRGB(14, 18, 22),
+    panelAlt = Color3.fromRGB(22, 28, 34),
+    border = Color3.fromRGB(40, 50, 58),
+    text = Color3.fromRGB(230, 236, 240),
+    muted = Color3.fromRGB(120, 132, 148),
     lime = Color3.fromRGB(180, 255, 40),
     limeDim = Color3.fromRGB(90, 140, 20),
-    limeSoft = Color3.fromRGB(140, 200, 50),
+    limeSoft = Color3.fromRGB(150, 210, 55),
     danger = Color3.fromRGB(255, 90, 90),
     enemy = Color3.fromRGB(255, 120, 80),
     npc = Color3.fromRGB(120, 200, 255),
     player = Color3.fromRGB(200, 140, 255),
-    ink = Color3.fromRGB(8, 10, 8),
+    ink = Color3.fromRGB(6, 8, 6),
 }
 
 local STATE = {
-    fly = false,
-    flySpeed = 120,
-    noclip = false,
-    killAura = false,
-    kaRange = 20,
-    kaRate = 4,
     farm = false,
-    bfSpeed = 150,
     autoQuest = false,
+    killAura = false,
+    mobPull = false,
+    autoBuso = false,
+    fastFarm = false,
+    kaRange = 22,
+    kaRate = 6,
+    bfSpeed = 160,
     enemyEsp = false,
     npcEsp = false,
     playerEsp = false,
+    scoutAutoCopy = true,
     panelVisible = true,
 }
 
@@ -80,6 +81,7 @@ local ST = {
     buso = "—",
     level = "—",
     remotes = "—",
+    lastScoutCopy = "noch nie",
 }
 
 local ESP_FOLDER_NAME = "DXLTA_ESP"
@@ -93,21 +95,30 @@ local playerEspMap = {}
 local alive = true
 local travelTok = 0
 local pin = nil
-local keysDown = {}
-local flyBV, flyBG
-local noclipSaved = {}
 local farmTargetName = nil
 local lastClick = 0
 local lastQuestTry = 0
+local lastBusoTry = 0
+local lastAuraNear = nil
+local lastFarmLogged = "idle"
 local killWatch = setmetatable({}, { __mode = "k" })
+local animHooks = {}
+local discoveredRemotes = {}
 
--- Scout ring log + last dump
-local RING_MAX = 80
+local RING_MAX = 100
 local ringLog = {}
 local lastDumpText = ""
 local lastDumpLines = {}
-local lastFarmLogged = "idle"
-local lastAuraNear = nil
+local lastAutoCopyAt = 0
+
+local liveLabels = {}
+local tabPages = {}
+local tabButtons = {}
+local currentTab = "Start"
+local scoutStatusLbl
+local scoutFilterBox
+local scoutPreviewLbl
+local setScoutStatus
 
 local function track(conn)
     if conn then
@@ -263,7 +274,7 @@ local function isPlayerCharacter(model)
     return false
 end
 
--- ── Folders ─────────────────────────────────────────────────────────────────
+-- ── Folders / remotes ───────────────────────────────────────────────────────
 
 local function getEnemiesFolder()
     return Workspace:FindFirstChild("Enemies")
@@ -347,6 +358,53 @@ local function invokeComm(...)
     return ok, res
 end
 
+local function rememberRemote(inst)
+    if not inst then
+        return
+    end
+    local path = inst:GetFullName()
+    if not discoveredRemotes[path] then
+        discoveredRemotes[path] = inst.ClassName
+        ringPush("remote+ " .. inst.ClassName .. " " .. inst.Name)
+    end
+end
+
+local function discoverCombatRemotes()
+    local found = {}
+    local function walk(root, depth)
+        if not root or depth > 5 then
+            return
+        end
+        local ok, kids = pcall(function()
+            return root:GetChildren()
+        end)
+        if not ok or not kids then
+            return
+        end
+        for _, c in ipairs(kids) do
+            local n = string.lower(c.Name)
+            if c:IsA("RemoteEvent") or c:IsA("RemoteFunction") or c:IsA("UnreliableRemoteEvent") then
+                rememberRemote(c)
+                if string.find(n, "combat", 1, true)
+                    or string.find(n, "attack", 1, true)
+                    or string.find(n, "hit", 1, true)
+                    or string.find(n, "register", 1, true)
+                    or string.find(n, "shoot", 1, true)
+                    or string.find(n, "damage", 1, true)
+                    or n == "re" then
+                    table.insert(found, c)
+                end
+            end
+            if c:IsA("Folder") or c:IsA("ModuleScript") or c.ClassName == "Folder" then
+                walk(c, depth + 1)
+            end
+        end
+    end
+    pcall(walk, getNetFolder(), 0)
+    pcall(walk, ReplicatedStorage:FindFirstChild("Remotes"), 0)
+    return found
+end
+
 local function countNetRemotes()
     local n = 0
     local net = getNetFolder()
@@ -360,6 +418,7 @@ local function countNetRemotes()
         for _, c in ipairs(inst:GetChildren()) do
             if c:IsA("RemoteEvent") or c:IsA("RemoteFunction") or c:IsA("UnreliableRemoteEvent") then
                 n += 1
+                rememberRemote(c)
             end
             walk(c, depth + 1)
         end
@@ -663,33 +722,33 @@ local function refreshStatus()
     end
 end
 
-local function scanNetRemotes()
-    local lines = {}
-    local net = getNetFolder()
-    if not net then
-        table.insert(lines, "(Modules.Net nicht gefunden)")
-        return lines, 0
+local function seaLabel()
+    local pid = game.PlaceId
+    if pid == 2753915549 then
+        return "First Sea"
+    elseif pid == 4442272183 then
+        return "Second Sea"
+    elseif pid == 7449423635 then
+        return "Third Sea"
     end
-    local kids = {}
-    local ok, children = pcall(function()
-        return net:GetChildren()
-    end)
-    if not ok or not children then
-        table.insert(lines, "(Fehler beim Lesen von Modules.Net)")
-        return lines, 0
-    end
-    for _, child in ipairs(children) do
-        table.insert(kids, child)
-    end
-    table.sort(kids, function(a, b)
-        return a.Name < b.Name
-    end)
-    table.insert(lines, string.format("Modules.Net — %d Einträge", #kids))
-    table.insert(lines, "--------------------------------")
-    for _, child in ipairs(kids) do
-        table.insert(lines, string.format("%s  [%s]", child.Name, child.ClassName))
-    end
-    return lines, #kids
+    return "unknown"
+end
+
+local function statusOneLiner()
+    pcall(refreshStatus)
+    return string.format(
+        "LV=%s farm=%s kills=%s near=%s Busy=%s Stun=%s Buso=%s remotes=%s sea=%s PlaceId=%s",
+        tostring(ST.level),
+        STATE.farm and "ON" or "OFF",
+        tostring(ST.kills),
+        tostring(ST.nearest),
+        tostring(ST.busy),
+        tostring(ST.stun),
+        tostring(ST.buso),
+        tostring(ST.remotes),
+        seaLabel(),
+        tostring(game.PlaceId)
+    )
 end
 
 -- ── Scout / Explorer dump ───────────────────────────────────────────────────
@@ -722,18 +781,6 @@ local function getFullPath(inst)
         cur = cur.Parent
     end
     return "game." .. table.concat(parts, ".")
-end
-
-local function seaLabel()
-    local pid = game.PlaceId
-    if pid == 2753915549 then
-        return "First Sea"
-    elseif pid == 4442272183 then
-        return "Second Sea"
-    elseif pid == 7449423635 then
-        return "Third Sea"
-    end
-    return "unknown"
 end
 
 local function childSummary(container, limit)
@@ -865,7 +912,7 @@ local function scoutWalk(root, lines, truncated, depthCap, skipChildNames)
         local pri, rest = {}, {}
         for _, c in ipairs(kids) do
             if depth == 0 and skipChildNames[c.Name] then
-                -- already dumped in priority pass
+                -- skip
             elseif isPriorityName(c.Name) or c:IsA("RemoteEvent") or c:IsA("RemoteFunction") or c:IsA("UnreliableRemoteEvent") then
                 table.insert(pri, c)
             else
@@ -890,7 +937,7 @@ end
 
 local function buildScoutHeader()
     local lines = {}
-    table.insert(lines, "========== DXLTA SCOUT DUMP ==========")
+    table.insert(lines, "========== DXLTA SCOUT BUNDLE ==========")
     table.insert(lines, string.format(
         "PlaceId=%s  GameId=%s  JobId=%s",
         tostring(game.PlaceId),
@@ -900,12 +947,29 @@ local function buildScoutHeader()
     table.insert(lines, string.format("Sea=%s  Time=%s", seaLabel(), os.date("%Y-%m-%d %H:%M:%S")))
     local lv = dataVal("Level")
     table.insert(lines, string.format("Level=%s  Player=%s", tostring(lv ~= nil and lv or "?"), LocalPlayer.Name))
+    table.insert(lines, "STATUS: " .. statusOneLiner())
+    table.insert(lines, string.format(
+        "FLAGS: farm=%s quest=%s aura=%s pull=%s buso=%s fast=%s",
+        tostring(STATE.farm),
+        tostring(STATE.autoQuest),
+        tostring(STATE.killAura),
+        tostring(STATE.mobPull),
+        tostring(STATE.autoBuso),
+        tostring(STATE.fastFarm)
+    ))
+    table.insert(lines, "FarmState=" .. tostring(ST.farm) .. "  Nearest=" .. tostring(ST.nearest))
     local data = LocalPlayer:FindFirstChild("Data")
     table.insert(lines, "LocalPlayer.Data children: " .. childSummary(data, 60))
     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
     table.insert(lines, "RS.Remotes children: " .. childSummary(remotes, 80))
     local net = getNetFolder()
     table.insert(lines, "Modules.Net children: " .. childSummary(net, 80))
+    local disc = {}
+    for path, cls in pairs(discoveredRemotes) do
+        table.insert(disc, cls .. " " .. path)
+    end
+    table.sort(disc)
+    table.insert(lines, "Discovered remotes: " .. (#disc > 0 and table.concat(disc, " | ") or "(none yet)"))
     local enemies = getEnemiesFolder()
     local sample = {}
     if enemies then
@@ -923,9 +987,11 @@ local function buildScoutHeader()
         end
     end
     table.insert(lines, "workspace.Enemies sample: " .. (#sample > 0 and table.concat(sample, ", ") or "(none)"))
-    table.insert(lines, "------------------------------------------")
-    table.insert(lines, "Format: ClassName | game.Path  ·  remotes/net/comm first · skip deep FX.Configuration")
-    table.insert(lines, string.format("MaxDepth=%d  MaxLines=%d", SCOUT_MAX_DEPTH, SCOUT_MAX_LINES))
+    table.insert(lines, "----- RING LOG (tail) -----")
+    local start = math.max(1, #ringLog - 40)
+    for i = start, #ringLog do
+        table.insert(lines, ringLog[i])
+    end
     table.insert(lines, "------------------------------------------")
     return lines
 end
@@ -934,7 +1000,6 @@ local function runScoutScan(filterRaw)
     local lines = buildScoutHeader()
     local truncated = { false }
 
-    -- Priority roots first
     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
     if remotes then
         table.insert(lines, "")
@@ -959,7 +1024,6 @@ local function runScoutScan(filterRaw)
             table.insert(lines, string.format("%s | %s", m.ClassName, getFullPath(m)))
         end
     end
-
     if not truncated[1] then
         table.insert(lines, "")
         table.insert(lines, "### Workspace ###")
@@ -969,26 +1033,6 @@ local function runScoutScan(filterRaw)
         table.insert(lines, "")
         table.insert(lines, "### ReplicatedStorage (rest) ###")
         scoutWalk(ReplicatedStorage, lines, truncated, SCOUT_MAX_DEPTH, { Remotes = true, Modules = true })
-    end
-    local extra = {
-        "ReplicatedFirst",
-        "Players",
-        "Lighting",
-        "StarterGui",
-        "StarterPack",
-    }
-    for _, name in ipairs(extra) do
-        if truncated[1] then
-            break
-        end
-        local ok, root = pcall(function()
-            return game:GetService(name)
-        end)
-        if ok and root then
-            table.insert(lines, "")
-            table.insert(lines, string.format("### %s ###", name))
-            scoutWalk(root, lines, truncated, SCOUT_MAX_DEPTH)
-        end
     end
 
     table.insert(lines, "")
@@ -1010,119 +1054,32 @@ local function runScoutScan(filterRaw)
     return table.concat(filtered, "\n"), filtered, #lines
 end
 
-local function statusOneLiner()
-    pcall(refreshStatus)
-    local farmOn = STATE.farm and "ON" or "OFF"
-    return string.format(
-        "LV=%s farm=%s kills=%s near=%s Busy=%s Stun=%s Buso=%s remotes=%s sea=%s",
-        tostring(ST.level),
-        farmOn,
-        tostring(ST.kills),
-        tostring(ST.nearest),
-        tostring(ST.busy),
-        tostring(ST.stun),
-        tostring(ST.buso),
-        tostring(ST.remotes),
-        seaLabel()
-    )
+local function buildScoutBundleLite()
+    local lines = buildScoutHeader()
+    table.insert(lines, "========== END BUNDLE ==========")
+    return table.concat(lines, "\n")
 end
 
--- ── Noclip / Fly ────────────────────────────────────────────────────────────
-
-local function applyNoclip(on)
-    local c = localChar()
-    if not c then
-        return
-    end
-    for _, part in ipairs(c:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if on then
-                if noclipSaved[part] == nil then
-                    noclipSaved[part] = part.CanCollide
-                end
-                part.CanCollide = false
-            elseif noclipSaved[part] ~= nil then
-                part.CanCollide = noclipSaved[part]
-                noclipSaved[part] = nil
-            end
+local function doAutoCopyScout()
+    local bundle = buildScoutBundleLite()
+    if copyClip(bundle) then
+        lastAutoCopyAt = os.clock()
+        ST.lastScoutCopy = os.date("%H:%M:%S")
+        if setScoutStatus then
+            setScoutStatus("Auto-Copy @ " .. ST.lastScoutCopy, true)
         end
+        if liveLabels.lastScoutCopy then
+            liveLabels.lastScoutCopy.Text = ST.lastScoutCopy
+        end
+        return true
     end
+    if setScoutStatus then
+        setScoutStatus("Auto-Copy failed (no clipboard)", false)
+    end
+    return false
 end
 
-local function wantNoclip()
-    return STATE.noclip == true and (STATE.fly == true or STATE.farm == true or pin ~= nil)
-end
-
-local function stopFlyBody()
-    if flyBV then
-        pcall(function()
-            flyBV:Destroy()
-        end)
-        flyBV = nil
-    end
-    if flyBG then
-        pcall(function()
-            flyBG:Destroy()
-        end)
-        flyBG = nil
-    end
-end
-
-local function ensureFlyBody()
-    local r = localRoot()
-    if not r then
-        return
-    end
-    if not flyBV or flyBV.Parent ~= r then
-        stopFlyBody()
-        local bv = Instance.new("BodyVelocity")
-        bv.Name = "DXLTA_FlyBV"
-        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        bv.Velocity = Vector3.zero
-        bv.Parent = r
-        flyBV = bv
-        local bg = Instance.new("BodyGyro")
-        bg.Name = "DXLTA_FlyBG"
-        bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-        bg.P = 3000
-        bg.CFrame = r.CFrame
-        bg.Parent = r
-        flyBG = bg
-    end
-end
-
-local function flyDir()
-    local cam = Workspace.CurrentCamera
-    if not cam then
-        return Vector3.zero
-    end
-    local cf = cam.CFrame
-    local move = Vector3.zero
-    if keysDown[Enum.KeyCode.W] then
-        move += cf.LookVector
-    end
-    if keysDown[Enum.KeyCode.S] then
-        move -= cf.LookVector
-    end
-    if keysDown[Enum.KeyCode.A] then
-        move -= cf.RightVector
-    end
-    if keysDown[Enum.KeyCode.D] then
-        move += cf.RightVector
-    end
-    if keysDown[Enum.KeyCode.Space] or keysDown[Enum.KeyCode.E] then
-        move += Vector3.new(0, 1, 0)
-    end
-    if keysDown[Enum.KeyCode.LeftControl] or keysDown[Enum.KeyCode.Q] then
-        move -= Vector3.new(0, 1, 0)
-    end
-    if move.Magnitude < 0.05 then
-        return Vector3.zero
-    end
-    return move.Unit
-end
-
--- ── Tween travel ────────────────────────────────────────────────────────────
+-- ── Tween travel (farm-only, not user Fly) ──────────────────────────────────
 
 local function stopTravel()
     travelTok += 1
@@ -1158,7 +1115,7 @@ local function travelTo(dest, label, keep)
         if tok ~= travelTok or not r.Parent then
             break
         end
-        local speed = math.clamp(tonumber(STATE.bfSpeed) or 150, 50, 300)
+        local speed = math.clamp(tonumber(STATE.bfSpeed) or 160, 50, 300)
         local goal = pts[idx]
         local d = goal - r.Position
         local step = speed * math.min(dt, 0.1)
@@ -1190,20 +1147,135 @@ local function travelTo(dest, label, keep)
     return okArrived
 end
 
--- ── Combat ──────────────────────────────────────────────────────────────────
+-- ── Silent combat / animation suppress ──────────────────────────────────────
 
-local function equipAnyTool()
+local ATTACK_ANIM_HINTS = {
+    "attack", "slash", "punch", "m1", "combat", "swing", "hit", "melee", "combo", "strike",
+}
+
+local function isAttackAnimTrack(track)
+    if not track then
+        return false
+    end
+    local name = ""
+    local id = ""
+    pcall(function()
+        name = string.lower(tostring(track.Name or ""))
+    end)
+    pcall(function()
+        local anim = track.Animation
+        if anim then
+            id = string.lower(tostring(anim.AnimationId or ""))
+            name = name .. " " .. string.lower(tostring(anim.Name or ""))
+        end
+    end)
+    local blob = name .. " " .. id
+    for _, hint in ipairs(ATTACK_ANIM_HINTS) do
+        if string.find(blob, hint, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function stopAttackTracks()
+    local char = localChar()
+    if not char then
+        return
+    end
+    local hum = getHumanoid(char)
+    local animator = hum and hum:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = char:FindFirstChildOfClass("Animator")
+    end
+    local function stopOn(obj)
+        if not obj then
+            return
+        end
+        local ok, tracks = pcall(function()
+            return obj:GetPlayingAnimationTracks()
+        end)
+        if ok and tracks then
+            for _, tr in ipairs(tracks) do
+                if isAttackAnimTrack(tr) then
+                    pcall(function()
+                        tr:Stop(0)
+                    end)
+                end
+            end
+        end
+    end
+    stopOn(animator)
+    stopOn(hum)
+end
+
+local function clearAnimHooks()
+    for _, c in ipairs(animHooks) do
+        pcall(function()
+            c:Disconnect()
+        end)
+    end
+    table.clear(animHooks)
+end
+
+local function hookAnimSuppress(char)
+    clearAnimHooks()
+    if not char then
+        return
+    end
+    local hum = getHumanoid(char)
+    local animator = hum and hum:FindFirstChildOfClass("Animator")
+    if not animator then
+        pcall(function()
+            animator = Instance.new("Animator")
+            animator.Parent = hum
+        end)
+        animator = hum and hum:FindFirstChildOfClass("Animator")
+    end
+    local function onPlayed(track)
+        if not (STATE.killAura or STATE.farm or STATE.fastFarm) then
+            return
+        end
+        if isAttackAnimTrack(track) then
+            pcall(function()
+                track:Stop(0)
+            end)
+        end
+    end
+    if animator then
+        local c = animator.AnimationPlayed:Connect(onPlayed)
+        table.insert(animHooks, c)
+        track(c)
+    end
+    if hum then
+        local ok, c2 = pcall(function()
+            return hum.AnimationPlayed:Connect(onPlayed)
+        end)
+        if ok and c2 then
+            table.insert(animHooks, c2)
+            track(c2)
+        end
+    end
+end
+
+local function equipMeleeTool()
     local c, h = localChar(), localHum()
     if not (c and h) then
         return nil
     end
     local held = c:FindFirstChildOfClass("Tool")
     if held then
-        return held
+        local tip = ""
+        pcall(function()
+            tip = tostring(held.ToolTip or "")
+        end)
+        if tip == "Melee" then
+            return held
+        end
     end
     local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
     if not bp then
-        return nil
+        return held
     end
     for _, t in ipairs(bp:GetChildren()) do
         if t:IsA("Tool") then
@@ -1211,8 +1283,7 @@ local function equipAnyTool()
             pcall(function()
                 tip = tostring(t.ToolTip or "")
             end)
-            local low = string.lower(t.Name)
-            if tip == "Melee" or tip == "Sword" or not string.find(low, "fruit", 1, true) then
+            if tip == "Melee" then
                 pcall(function()
                     h:EquipTool(t)
                 end)
@@ -1220,18 +1291,44 @@ local function equipAnyTool()
             end
         end
     end
-    return nil
+    -- fallback: any non-fruit tool
+    for _, t in ipairs(bp:GetChildren()) do
+        if t:IsA("Tool") then
+            local low = string.lower(t.Name)
+            if not string.find(low, "fruit", 1, true) then
+                pcall(function()
+                    h:EquipTool(t)
+                end)
+                return t
+            end
+        end
+    end
+    return held
 end
 
-local function attackOnce()
-    local tool = equipAnyTool()
+local function fireCombatRemotes()
+    local remotes = discoverCombatRemotes()
+    for _, rem in ipairs(remotes) do
+        pcall(function()
+            if rem:IsA("RemoteEvent") or rem:IsA("UnreliableRemoteEvent") then
+                rem:FireServer()
+            elseif rem:IsA("RemoteFunction") then
+                rem:InvokeServer()
+            end
+        end)
+    end
+end
+
+local function attackOnceSilent()
+    local tool = equipMeleeTool()
     if tool then
         pcall(function()
             tool:Activate()
         end)
     end
+    pcall(fireCombatRemotes)
     local now = os.clock()
-    if now - lastClick > 0.12 then
+    if now - lastClick > 0.08 then
         lastClick = now
         pcall(function()
             if VirtualUser then
@@ -1242,6 +1339,9 @@ local function attackOnce()
             end
         end)
     end
+    -- suppress swing visuals immediately
+    stopAttackTracks()
+    task.defer(stopAttackTracks)
 end
 
 local function watchKill(tg)
@@ -1259,11 +1359,83 @@ local function watchKill(tg)
     track(c)
 end
 
+-- ── Mob Pull (client-owned) ─────────────────────────────────────────────────
+
+local function isNetOwner(part)
+    if not part then
+        return false
+    end
+    local ok, owner = pcall(function()
+        if typeof(isnetworkowner) == "function" then
+            return isnetworkowner(part)
+        end
+        return false
+    end)
+    return ok and owner == true
+end
+
+local function pullNearbyMobs(center, range)
+    if not STATE.mobPull or not center then
+        return
+    end
+    local myRoot = localRoot()
+    if not myRoot then
+        return
+    end
+    for _, enemy in ipairs(iterEnemyModels()) do
+        local hrp = getHRP(enemy)
+        if hrp and isNetOwner(hrp) then
+            local d = (hrp.Position - center).Magnitude
+            if d <= (range or 60) and d > 6 then
+                local away = flat(myRoot.Position - hrp.Position)
+                away = away.Magnitude > 0.1 and away.Unit or Vector3.new(0, 0, 1)
+                local spot = myRoot.Position + away * 5 + Vector3.new(0, 1, 0)
+                pcall(function()
+                    hrp.CFrame = CFrame.new(spot)
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                end)
+            end
+        end
+    end
+end
+
+-- ── Auto Buso ───────────────────────────────────────────────────────────────
+
+local function tryAutoBuso()
+    if not STATE.autoBuso then
+        return
+    end
+    if os.clock() - lastBusoTry < 2.5 then
+        return
+    end
+    local char = localChar()
+    if not char then
+        return
+    end
+    if char:FindFirstChild("HasBuso") then
+        return
+    end
+    lastBusoTry = os.clock()
+    local ok = invokeComm("Buso")
+    if not ok then
+        pcall(function()
+            if VirtualInputManager then
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.J, false, game)
+                task.wait(0.05)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.J, false, game)
+            end
+        end)
+        ringPush("Buso key J fallback")
+    end
+end
+
+-- ── Kill Aura ───────────────────────────────────────────────────────────────
+
 local function killAuraTick()
     if not STATE.killAura and not STATE.farm then
         return
     end
-    local range = math.clamp(tonumber(STATE.kaRange) or 20, 5, 50)
+    local range = math.clamp(tonumber(STATE.kaRange) or 22, 5, 60)
     local filter = STATE.farm and farmTargetName or nil
     local tg, d = findNearestEnemy(range, filter)
     if not tg and STATE.farm then
@@ -1284,11 +1456,14 @@ local function killAuraTick()
             r.CFrame = safeLookAt(r.Position, look)
         end)
     end
+    if STATE.mobPull then
+        pullNearbyMobs(tg.root.Position, range + 25)
+    end
     watchKill(tg)
-    attackOnce()
+    attackOnceSilent()
 end
 
--- ── Quests ──────────────────────────────────────────────────────────────────
+-- ── Quests (Sea 1) ──────────────────────────────────────────────────────────
 
 local Q1 = {
     { 0, "BanditQuest1", 1, "Bandit" },
@@ -1440,6 +1615,7 @@ local function farmStep()
         stopTravel()
         return
     end
+    pcall(tryAutoBuso)
     if STATE.autoQuest then
         pcall(tryAutoQuest)
     end
@@ -1475,7 +1651,10 @@ local function farmStep()
     watchKill(tg)
     pin = { pos = spot, root = tg.root, untilT = os.clock() + 2.5 }
     ST.farm = "farming " .. tg.name
-    local rate = math.clamp(tonumber(STATE.kaRate) or 4, 1, 12)
+    if STATE.mobPull then
+        pullNearbyMobs(spot, 50)
+    end
+    local rate = math.clamp(tonumber(STATE.kaRate) or 6, 1, 14)
     for _ = 1, 2 do
         if not STATE.farm or tg.hum.Health <= 0 then
             break
@@ -1491,12 +1670,36 @@ local function farmStep()
                 rr.CFrame = safeLookAt(spot, look)
             end
         end)
-        attackOnce()
+        attackOnceSilent()
         task.wait(1 / rate)
     end
 end
 
--- ── UI ──────────────────────────────────────────────────────────────────────
+local function applyFastFarm(on)
+    STATE.fastFarm = on
+    if on then
+        STATE.farm = true
+        STATE.autoQuest = true
+        STATE.killAura = true
+        STATE.autoBuso = true
+        ST.farm = "FAST FARM"
+        ringPush("FAST FARM ON")
+        notify("DXLTA", "FAST FARM an — Farm+Quest+Aura+Buso", 3)
+        hookAnimSuppress(localChar())
+    else
+        STATE.farm = false
+        STATE.autoQuest = false
+        STATE.killAura = false
+        -- keep autoBuso as user left it unless it was only via fast — turn off with master
+        STATE.autoBuso = false
+        pin = nil
+        stopTravel()
+        ST.farm = "idle"
+        ringPush("FAST FARM OFF")
+    end
+end
+
+-- ── UI helpers ──────────────────────────────────────────────────────────────
 
 local guiParent = getGuiParent()
 destroyByName(guiParent, GUI_NAME)
@@ -1510,16 +1713,19 @@ screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screen.DisplayOrder = 1000
 screen.Parent = guiParent
 
+-- Mobile-first: ~92% width, ~78% max height, centered
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
-panel.Size = UDim2.fromOffset(370, 580)
-panel.Position = UDim2.new(0, 24, 0.5, -290)
+panel.AnchorPoint = Vector2.new(0.5, 0.5)
+panel.Size = UDim2.new(0.92, 0, 0.78, 0)
+panel.Position = UDim2.fromScale(0.5, 0.5)
 panel.BackgroundColor3 = COLORS.panel
 panel.BorderSizePixel = 0
+panel.ClipsDescendants = true
 panel.Parent = screen
 
 local panelCorner = Instance.new("UICorner")
-panelCorner.CornerRadius = UDim.new(0, 10)
+panelCorner.CornerRadius = UDim.new(0, 14)
 panelCorner.Parent = panel
 
 local panelStroke = Instance.new("UIStroke")
@@ -1527,200 +1733,352 @@ panelStroke.Color = COLORS.limeDim
 panelStroke.Thickness = 1.5
 panelStroke.Parent = panel
 
+local panelGrad = Instance.new("UIGradient")
+panelGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 24, 20)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 18)),
+})
+panelGrad.Rotation = 110
+panelGrad.Parent = panel
+
+-- Header bar (compact — brand lives on Start tab)
 local header = Instance.new("Frame")
 header.Name = "Header"
-header.Size = UDim2.new(1, 0, 0, 72)
+header.Size = UDim2.new(1, 0, 0, 44)
 header.BackgroundColor3 = COLORS.bg
 header.BorderSizePixel = 0
 header.Parent = panel
 
 local headerCorner = Instance.new("UICorner")
-headerCorner.CornerRadius = UDim.new(0, 10)
+headerCorner.CornerRadius = UDim.new(0, 14)
 headerCorner.Parent = header
 
 local headerFix = Instance.new("Frame")
-headerFix.Size = UDim2.new(1, 0, 0, 14)
-headerFix.Position = UDim2.new(0, 0, 1, -14)
+headerFix.Size = UDim2.new(1, 0, 0, 16)
+headerFix.Position = UDim2.new(0, 0, 1, -16)
 headerFix.BackgroundColor3 = COLORS.bg
 headerFix.BorderSizePixel = 0
 headerFix.Parent = header
 
-local brand = Instance.new("TextLabel")
-brand.BackgroundTransparency = 1
-brand.Position = UDim2.fromOffset(16, 8)
-brand.Size = UDim2.new(1, -60, 0, 32)
-brand.Font = Enum.Font.GothamBlack
-brand.TextSize = 28
-brand.TextXAlignment = Enum.TextXAlignment.Left
-brand.TextColor3 = COLORS.lime
-brand.Text = "DXLTA"
-brand.Parent = header
-
-local subtitle = Instance.new("TextLabel")
-subtitle.BackgroundTransparency = 1
-subtitle.Position = UDim2.fromOffset(16, 40)
-subtitle.Size = UDim2.new(1, -60, 0, 20)
-subtitle.Font = Enum.Font.Gotham
-subtitle.TextSize = 12
-subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.TextColor3 = COLORS.muted
-subtitle.Text = "Blox Fruits Hub · RightShift"
-subtitle.Parent = header
+local headerBrand = Instance.new("TextLabel")
+headerBrand.BackgroundTransparency = 1
+headerBrand.Position = UDim2.fromOffset(14, 8)
+headerBrand.Size = UDim2.new(1, -70, 0, 28)
+headerBrand.Font = Enum.Font.GothamBlack
+headerBrand.TextSize = 18
+headerBrand.TextXAlignment = Enum.TextXAlignment.Left
+headerBrand.TextColor3 = COLORS.lime
+headerBrand.Text = "DXLTA"
+headerBrand.Parent = header
 
 local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.fromOffset(30, 28)
-closeBtn.Position = UDim2.new(1, -40, 0, 12)
+closeBtn.Size = UDim2.fromOffset(36, 32)
+closeBtn.Position = UDim2.new(1, -46, 0, 6)
 closeBtn.BackgroundColor3 = COLORS.panelAlt
 closeBtn.TextColor3 = COLORS.danger
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 14
-closeBtn.Text = "X"
+closeBtn.TextSize = 16
+closeBtn.Text = "×"
 closeBtn.AutoButtonColor = true
 closeBtn.Parent = header
-
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 4)
-closeCorner.Parent = closeBtn
-
-local body = Instance.new("ScrollingFrame")
-body.Name = "Body"
-body.Size = UDim2.new(1, -20, 1, -92)
-body.Position = UDim2.fromOffset(10, 82)
-body.BackgroundTransparency = 1
-body.BorderSizePixel = 0
-body.ScrollBarThickness = 4
-body.ScrollBarImageColor3 = COLORS.limeDim
-body.CanvasSize = UDim2.new(0, 0, 0, 0)
-body.AutomaticCanvasSize = Enum.AutomaticSize.Y
-body.Parent = panel
-
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 8)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Parent = body
-
-local orderN = 0
-local function nextOrder()
-    orderN += 1
-    return orderN
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 8)
+    c.Parent = closeBtn
 end
 
-local liveLabels = {}
+-- Bottom category tabs
+local TAB_H = 54
+local tabBar = Instance.new("Frame")
+tabBar.Name = "Tabs"
+tabBar.Size = UDim2.new(1, 0, 0, TAB_H)
+tabBar.Position = UDim2.new(0, 0, 1, -TAB_H)
+tabBar.BackgroundColor3 = COLORS.bg
+tabBar.BorderSizePixel = 0
+tabBar.Parent = panel
 
-local function sectionLabel(text)
+local tabBarTop = Instance.new("Frame")
+tabBarTop.Size = UDim2.new(1, 0, 0, 12)
+tabBarTop.BackgroundColor3 = COLORS.bg
+tabBarTop.BorderSizePixel = 0
+tabBarTop.Parent = tabBar
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+tabLayout.Padding = UDim.new(0, 4)
+tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tabLayout.Parent = tabBar
+
+local tabPad = Instance.new("UIPadding")
+tabPad.PaddingLeft = UDim.new(0, 6)
+tabPad.PaddingRight = UDim.new(0, 6)
+tabPad.PaddingBottom = UDim.new(0, 4)
+tabPad.Parent = tabBar
+
+local contentHost = Instance.new("Frame")
+contentHost.Name = "Content"
+contentHost.Size = UDim2.new(1, -12, 1, -(44 + TAB_H + 8))
+contentHost.Position = UDim2.fromOffset(6, 48)
+contentHost.BackgroundTransparency = 1
+contentHost.ClipsDescendants = true
+contentHost.Parent = panel
+
+local TABS = {
+    { id = "Start", label = "Start" },
+    { id = "Farm", label = "Farm" },
+    { id = "Kampf", label = "Kampf" },
+    { id = "ESP", label = "ESP" },
+    { id = "Scout", label = "Scout" },
+}
+
+local function switchTab(id)
+    currentTab = id
+    for name, page in pairs(tabPages) do
+        local show = name == id
+        page.Visible = show
+        if show then
+            page.CanvasPosition = Vector2.zero
+            -- soft fade-in (GroupTransparency when available)
+            pcall(function()
+                page.GroupTransparency = 0.35
+                task.spawn(function()
+                    for i = 1, 6 do
+                        if page.Visible then
+                            pcall(function()
+                                page.GroupTransparency = math.max(0, 0.35 - i * 0.06)
+                            end)
+                            task.wait(0.016)
+                        end
+                    end
+                    pcall(function()
+                        page.GroupTransparency = 0
+                    end)
+                end)
+            end)
+        end
+    end
+    for name, btn in pairs(tabButtons) do
+        if name == id then
+            btn.BackgroundColor3 = COLORS.lime
+            btn.TextColor3 = COLORS.ink
+        else
+            btn.BackgroundColor3 = COLORS.panelAlt
+            btn.TextColor3 = COLORS.muted
+        end
+    end
+end
+
+for i, meta in ipairs(TABS) do
+    local btn = Instance.new("TextButton")
+    btn.Name = "Tab_" .. meta.id
+    btn.Size = UDim2.new(0.19, 0, 0, 42)
+    btn.BackgroundColor3 = COLORS.panelAlt
+    btn.TextColor3 = COLORS.muted
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.Text = meta.label
+    btn.AutoButtonColor = true
+    btn.LayoutOrder = i
+    btn.Parent = tabBar
+    do
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 10)
+        c.Parent = btn
+    end
+    tabButtons[meta.id] = btn
+    btn.MouseButton1Click:Connect(function()
+        switchTab(meta.id)
+    end)
+
+    local page = Instance.new("ScrollingFrame")
+    page.Name = "Page_" .. meta.id
+    page.Size = UDim2.fromScale(1, 1)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 3
+    page.ScrollBarImageColor3 = COLORS.limeDim
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.Visible = false
+    page.Parent = contentHost
+
+    local lay = Instance.new("UIListLayout")
+    lay.Padding = UDim.new(0, 8)
+    lay.SortOrder = Enum.SortOrder.LayoutOrder
+    lay.Parent = page
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 4)
+    pad.PaddingBottom = UDim.new(0, 12)
+    pad.PaddingLeft = UDim.new(0, 2)
+    pad.PaddingRight = UDim.new(0, 2)
+    pad.Parent = page
+
+    tabPages[meta.id] = page
+end
+
+local orderN = {}
+local function nextOrder(tab)
+    orderN[tab] = (orderN[tab] or 0) + 1
+    return orderN[tab]
+end
+
+local function parentOf(tab)
+    return tabPages[tab]
+end
+
+local function sectionLabel(tab, text)
     local lbl = Instance.new("TextLabel")
     lbl.BackgroundTransparency = 1
-    lbl.Size = UDim2.new(1, 0, 0, 18)
+    lbl.Size = UDim2.new(1, 0, 0, 20)
     lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 12
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.TextColor3 = COLORS.limeSoft
     lbl.Text = text
-    lbl.LayoutOrder = nextOrder()
-    lbl.Parent = body
+    lbl.LayoutOrder = nextOrder(tab)
+    lbl.Parent = parentOf(tab)
     return lbl
 end
 
-local function makeToggle(label, key, onChange)
+local function makeToggle(tab, label, key, onChange, opts)
+    opts = opts or {}
+    local h = opts.giant and 64 or 48
     local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 36)
-    row.BackgroundColor3 = COLORS.panelAlt
+    row.Size = UDim2.new(1, 0, 0, h)
+    row.BackgroundColor3 = opts.giant and Color3.fromRGB(28, 40, 22) or COLORS.panelAlt
     row.BorderSizePixel = 0
-    row.LayoutOrder = nextOrder()
-    row.Parent = body
+    row.LayoutOrder = nextOrder(tab)
+    row.Parent = parentOf(tab)
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 10)
     corner.Parent = row
+
+    if opts.giant then
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = COLORS.limeDim
+        stroke.Thickness = 1.5
+        stroke.Parent = row
+    end
 
     local text = Instance.new("TextLabel")
     text.BackgroundTransparency = 1
-    text.Position = UDim2.fromOffset(12, 0)
-    text.Size = UDim2.new(1, -70, 1, 0)
-    text.Font = Enum.Font.Gotham
-    text.TextSize = 13
+    text.Position = UDim2.fromOffset(14, 0)
+    text.Size = UDim2.new(1, -90, 1, 0)
+    text.Font = opts.giant and Enum.Font.GothamBlack or Enum.Font.GothamMedium
+    text.TextSize = opts.giant and 18 or 14
     text.TextXAlignment = Enum.TextXAlignment.Left
     text.TextColor3 = COLORS.text
     text.Text = label
     text.Parent = row
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.fromOffset(52, 24)
-    btn.Position = UDim2.new(1, -60, 0.5, -12)
+    btn.Size = UDim2.fromOffset(opts.giant and 72 or 58, opts.giant and 36 or 30)
+    btn.Position = UDim2.new(1, opts.giant and -84 or -70, 0.5, opts.giant and -18 or -15)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 12
+    btn.TextSize = opts.giant and 14 or 13
     btn.AutoButtonColor = true
     btn.Parent = row
-
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 4)
-    btnCorner.Parent = btn
+    do
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 8)
+        c.Parent = btn
+    end
 
     local function paint()
         if STATE[key] then
             btn.BackgroundColor3 = COLORS.lime
-            btn.TextColor3 = COLORS.bg
+            btn.TextColor3 = COLORS.ink
             btn.Text = "AN"
+            if opts.giant then
+                row.BackgroundColor3 = Color3.fromRGB(36, 55, 22)
+            end
         else
             btn.BackgroundColor3 = COLORS.border
             btn.TextColor3 = COLORS.muted
             btn.Text = "AUS"
+            if opts.giant then
+                row.BackgroundColor3 = Color3.fromRGB(28, 40, 22)
+            end
         end
     end
     paint()
 
-    btn.MouseButton1Click:Connect(function()
+    local function toggle()
         STATE[key] = not STATE[key]
         paint()
         if onChange then
             safeCall(onChange, STATE[key])
         end
-    end)
+    end
+
+    btn.MouseButton1Click:Connect(toggle)
+    -- whole row touchable
+    local hit = Instance.new("TextButton")
+    hit.BackgroundTransparency = 1
+    hit.Size = UDim2.new(1, -90, 1, 0)
+    hit.Text = ""
+    hit.ZIndex = 2
+    hit.Parent = row
+    hit.MouseButton1Click:Connect(toggle)
+
+    return {
+        paint = paint,
+        set = function(v)
+            STATE[key] = v and true or false
+            paint()
+        end,
+    }
 end
 
-local function makeSlider(label, key, minV, maxV)
+local function makeSlider(tab, label, key, minV, maxV)
     local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 44)
+    row.Size = UDim2.new(1, 0, 0, 56)
     row.BackgroundColor3 = COLORS.panelAlt
     row.BorderSizePixel = 0
-    row.LayoutOrder = nextOrder()
-    row.Parent = body
+    row.LayoutOrder = nextOrder(tab)
+    row.Parent = parentOf(tab)
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 10)
     corner.Parent = row
 
     local lab = Instance.new("TextLabel")
     lab.BackgroundTransparency = 1
-    lab.Position = UDim2.fromOffset(12, 4)
-    lab.Size = UDim2.new(1, -24, 0, 16)
+    lab.Position = UDim2.fromOffset(14, 6)
+    lab.Size = UDim2.new(1, -28, 0, 18)
     lab.Font = Enum.Font.Gotham
-    lab.TextSize = 12
+    lab.TextSize = 13
     lab.TextXAlignment = Enum.TextXAlignment.Left
     lab.TextColor3 = COLORS.text
     lab.Text = label .. ": " .. tostring(STATE[key])
     lab.Parent = row
 
     local bar = Instance.new("Frame")
-    bar.Position = UDim2.fromOffset(12, 26)
-    bar.Size = UDim2.new(1, -24, 0, 10)
+    bar.Position = UDim2.fromOffset(14, 32)
+    bar.Size = UDim2.new(1, -28, 0, 14)
     bar.BackgroundColor3 = COLORS.border
     bar.BorderSizePixel = 0
     bar.Parent = row
-
-    local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(0, 5)
-    barCorner.Parent = bar
+    do
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 7)
+        c.Parent = bar
+    end
 
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new((STATE[key] - minV) / math.max(maxV - minV, 1), 0, 1, 0)
     fill.BackgroundColor3 = COLORS.lime
     fill.BorderSizePixel = 0
     fill.Parent = bar
-
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(0, 5)
-    fillCorner.Parent = fill
+    do
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 7)
+        c.Parent = fill
+    end
 
     local dragging = false
     local function setFromX(x)
@@ -1749,18 +2107,18 @@ local function makeSlider(label, key, minV, maxV)
     end))
 end
 
-local function makeLive(title, key)
+local function makeLive(tab, title, key)
     local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 18)
+    row.Size = UDim2.new(1, 0, 0, 22)
     row.BackgroundTransparency = 1
-    row.LayoutOrder = nextOrder()
-    row.Parent = body
+    row.LayoutOrder = nextOrder(tab)
+    row.Parent = parentOf(tab)
 
     local left = Instance.new("TextLabel")
     left.BackgroundTransparency = 1
-    left.Size = UDim2.new(0.36, 0, 1, 0)
+    left.Size = UDim2.new(0.4, 0, 1, 0)
     left.Font = Enum.Font.Gotham
-    left.TextSize = 11
+    left.TextSize = 12
     left.TextXAlignment = Enum.TextXAlignment.Left
     left.TextColor3 = COLORS.muted
     left.Text = title
@@ -1768,10 +2126,10 @@ local function makeLive(title, key)
 
     local val = Instance.new("TextLabel")
     val.BackgroundTransparency = 1
-    val.Position = UDim2.new(0.36, 0, 0, 0)
-    val.Size = UDim2.new(0.64, 0, 1, 0)
+    val.Position = UDim2.new(0.4, 0, 0, 0)
+    val.Size = UDim2.new(0.6, 0, 1, 0)
     val.Font = Enum.Font.Code
-    val.TextSize = 11
+    val.TextSize = 12
     val.TextXAlignment = Enum.TextXAlignment.Right
     val.TextColor3 = COLORS.lime
     val.TextTruncate = Enum.TextTruncate.AtEnd
@@ -1780,139 +2138,157 @@ local function makeLive(title, key)
     liveLabels[key] = val
 end
 
-local function makeButton(label, color, onClick)
+local function makeButton(tab, label, color, onClick)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 34)
+    btn.Size = UDim2.new(1, 0, 0, 46)
     btn.BackgroundColor3 = color or COLORS.lime
-    btn.TextColor3 = COLORS.bg
+    btn.TextColor3 = COLORS.ink
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
+    btn.TextSize = 14
     btn.Text = label
     btn.AutoButtonColor = true
-    btn.LayoutOrder = nextOrder()
-    btn.Parent = body
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
-
+    btn.LayoutOrder = nextOrder(tab)
+    btn.Parent = parentOf(tab)
+    do
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 10)
+        c.Parent = btn
+    end
     btn.MouseButton1Click:Connect(function()
         safeCall(onClick)
     end)
     return btn
 end
 
-local function makeRemotesBox()
-    local wrap = Instance.new("Frame")
-    wrap.Size = UDim2.new(1, 0, 0, 130)
-    wrap.BackgroundColor3 = COLORS.bg
-    wrap.BorderSizePixel = 0
-    wrap.LayoutOrder = nextOrder()
-    wrap.Parent = body
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = wrap
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = COLORS.border
-    stroke.Thickness = 1
-    stroke.Parent = wrap
-
-    local countLbl = Instance.new("TextLabel")
-    countLbl.BackgroundTransparency = 1
-    countLbl.Position = UDim2.fromOffset(10, 4)
-    countLbl.Size = UDim2.new(1, -20, 0, 18)
-    countLbl.Font = Enum.Font.GothamBold
-    countLbl.TextSize = 12
-    countLbl.TextXAlignment = Enum.TextXAlignment.Left
-    countLbl.TextColor3 = COLORS.limeSoft
-    countLbl.Text = "Net Remotes: …"
-    countLbl.Parent = wrap
-
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -12, 1, -28)
-    scroll.Position = UDim2.fromOffset(6, 24)
-    scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 4
-    scroll.ScrollBarImageColor3 = COLORS.limeDim
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.Parent = wrap
-
-    local text = Instance.new("TextLabel")
-    text.BackgroundTransparency = 1
-    text.Size = UDim2.new(1, -8, 0, 0)
-    text.Position = UDim2.fromOffset(4, 0)
-    text.AutomaticSize = Enum.AutomaticSize.Y
-    text.Font = Enum.Font.Code
-    text.TextSize = 11
-    text.TextXAlignment = Enum.TextXAlignment.Left
-    text.TextYAlignment = Enum.TextYAlignment.Top
-    text.TextColor3 = COLORS.muted
-    text.TextWrapped = true
-    text.Text = "lade…"
-    text.Parent = scroll
-
-    return countLbl, text
+local function makeTip(tab, text, h)
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundColor3 = COLORS.bg
+    lbl.Size = UDim2.new(1, 0, 0, h or 44)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextYAlignment = Enum.TextYAlignment.Center
+    lbl.TextColor3 = COLORS.muted
+    lbl.TextWrapped = true
+    lbl.Text = "  " .. text
+    lbl.LayoutOrder = nextOrder(tab)
+    lbl.Parent = parentOf(tab)
+    do
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 8)
+        c.Parent = lbl
+    end
+    return lbl
 end
 
--- Build sections
-local hint = Instance.new("TextLabel")
-hint.BackgroundTransparency = 1
-hint.Size = UDim2.new(1, 0, 0, 28)
-hint.Font = Enum.Font.Gotham
-hint.TextSize = 11
-hint.TextXAlignment = Enum.TextXAlignment.Left
-hint.TextColor3 = COLORS.muted
-hint.TextWrapped = true
-hint.Text = "RightShift = Panel · Lime-Orb = wieder öffnen"
-hint.LayoutOrder = nextOrder()
-hint.Parent = body
+-- Keep refs to sync paints when Fast Farm flips slaves
+local farmToggleUI, questToggleUI, auraToggleUI, busoToggleUI, fastToggleUI
 
-sectionLabel("MOVEMENT")
-makeToggle("Fly (WASD · Space/Ctrl · E/Q)", "fly", function(on)
-    if not on then
-        stopFlyBody()
-        local h = localHum()
-        if h then
-            h.PlatformStand = false
-        end
-    end
-end)
-makeSlider("Fly speed", "flySpeed", 50, 300)
-makeToggle("Noclip (mit Fly / Farm)", "noclip", function(on)
-    if not on then
-        applyNoclip(false)
-    end
-end)
-makeSlider("Tween / Farm speed", "bfSpeed", 50, 300)
+-- ═══ START TAB ══════════════════════════════════════════════════════════════
 
-sectionLabel("COMBAT / FARM")
-makeToggle("Kill Aura", "killAura", function(on)
-    lastAuraNear = nil
-    ringPush(on and "kill aura ON" or "kill aura OFF")
-end)
-makeSlider("Aura range", "kaRange", 5, 50)
-makeSlider("Attack rate", "kaRate", 1, 12)
-makeToggle("Auto Level / Farm", "farm", function(on)
+do
+    local hero = Instance.new("TextLabel")
+    hero.BackgroundTransparency = 1
+    hero.Size = UDim2.new(1, 0, 0, 52)
+    hero.Font = Enum.Font.GothamBlack
+    hero.TextSize = 42
+    hero.TextXAlignment = Enum.TextXAlignment.Left
+    hero.TextColor3 = COLORS.lime
+    hero.Text = "DXLTA"
+    hero.LayoutOrder = nextOrder("Start")
+    hero.Parent = parentOf("Start")
+
+    local tagline = Instance.new("TextLabel")
+    tagline.BackgroundTransparency = 1
+    tagline.Size = UDim2.new(1, 0, 0, 22)
+    tagline.Font = Enum.Font.Gotham
+    tagline.TextSize = 14
+    tagline.TextXAlignment = Enum.TextXAlignment.Left
+    tagline.TextColor3 = COLORS.text
+    tagline.Text = "Nur Blox Fruits · ein Toggle farmt"
+    tagline.LayoutOrder = nextOrder("Start")
+    tagline.Parent = parentOf("Start")
+
+    fastToggleUI = makeToggle("Start", "FAST FARM", "fastFarm", function(on)
+        applyFastFarm(on)
+        if farmToggleUI then farmToggleUI.paint() end
+        if questToggleUI then questToggleUI.paint() end
+        if auraToggleUI then auraToggleUI.paint() end
+        if busoToggleUI then busoToggleUI.paint() end
+    end, { giant = true })
+
+    makeTip("Start", "Spiel 1–2 Min → Clipboard hier pasten (Auto-Scout kopiert alle 3s).", 48)
+
+    sectionLabel("Start", "LIVE STATUS")
+    makeLive("Start", "Level", "level")
+    makeLive("Start", "Kills", "kills")
+    makeLive("Start", "State", "farm")
+    makeLive("Start", "Nearest", "nearest")
+    makeLive("Start", "Last Scout Copy", "lastScoutCopy")
+    makeLive("Start", "Busy / Stun", "busy")
+    makeLive("Start", "HasBuso", "buso")
+
+    makeTip("Start", "RightShift = Panel · Lime-Orb unten rechts = wieder öffnen", 40)
+end
+
+-- ═══ FARM TAB ═══════════════════════════════════════════════════════════════
+
+farmToggleUI = makeToggle("Farm", "Auto Farm / Auto Level", "farm", function(on)
     if not on then
         pin = nil
         stopTravel()
         ST.farm = "idle"
         ringPush("farm OFF")
+        if STATE.fastFarm then
+            STATE.fastFarm = false
+            if fastToggleUI then fastToggleUI.paint() end
+        end
     else
         ST.farm = "starting"
         ringPush("farm ON")
+        hookAnimSuppress(localChar())
     end
 end)
-makeToggle("Auto Quest (CommF_ / Prompt)", "autoQuest", function(on)
+
+questToggleUI = makeToggle("Farm", "Auto Quest (CommF_ / Prompt)", "autoQuest", function(on)
     ringPush(on and "auto quest ON" or "auto quest OFF")
 end)
 
-sectionLabel("ESP")
-makeToggle("Gegner ESP (Enemies)", "enemyEsp", function(on)
+busoToggleUI = makeToggle("Farm", "Auto Buso (J / CommF_)", "autoBuso", function(on)
+    ringPush(on and "auto buso ON" or "auto buso OFF")
+    if on then
+        tryAutoBuso()
+    end
+end)
+
+makeToggle("Farm", "Mob Pull (network owner)", "mobPull", function(on)
+    ringPush(on and "mob pull ON" or "mob pull OFF")
+end)
+
+makeSlider("Farm", "Tween / Farm speed", "bfSpeed", 50, 300)
+makeTip("Farm", "Tween nur intern zum Mob — kein freies Fly.", 36)
+
+-- ═══ KAMPF TAB ══════════════════════════════════════════════════════════════
+
+auraToggleUI = makeToggle("Kampf", "Kill Aura (Silent M1)", "killAura", function(on)
+    lastAuraNear = nil
+    ringPush(on and "kill aura ON" or "kill aura OFF")
+    if on then
+        hookAnimSuppress(localChar())
+    end
+    if not on and STATE.fastFarm then
+        STATE.fastFarm = false
+        if fastToggleUI then fastToggleUI.paint() end
+    end
+end)
+
+makeSlider("Kampf", "Aura range", "kaRange", 5, 60)
+makeSlider("Kampf", "Attack rate", "kaRate", 1, 14)
+makeTip("Kampf", "Melee equip · face target · Activate · Attack-Anims gestoppt. Steht still-ish am Farm-Pin.", 56)
+
+-- ═══ ESP TAB ════════════════════════════════════════════════════════════════
+
+makeToggle("ESP", "Gegner ESP (Enemies)", "enemyEsp", function(on)
     if not on then
         for model in pairs(enemyEspMap) do
             clearEspOn(model)
@@ -1922,7 +2298,8 @@ makeToggle("Gegner ESP (Enemies)", "enemyEsp", function(on)
         refreshEnemyEsp()
     end
 end)
-makeToggle("NPC ESP", "npcEsp", function(on)
+
+makeToggle("ESP", "NPC ESP (optional)", "npcEsp", function(on)
     if not on then
         for model in pairs(npcEspMap) do
             clearEspOn(model)
@@ -1932,7 +2309,8 @@ makeToggle("NPC ESP", "npcEsp", function(on)
         refreshNpcEsp()
     end
 end)
-makeToggle("Spieler ESP", "playerEsp", function(on)
+
+makeToggle("ESP", "Spieler ESP (optional)", "playerEsp", function(on)
     if not on then
         for model in pairs(playerEspMap) do
             clearEspOn(model)
@@ -1943,107 +2321,75 @@ makeToggle("Spieler ESP", "playerEsp", function(on)
     end
 end)
 
-sectionLabel("STATUS (live)")
-makeLive("Farm", "farm")
-makeLive("Kills", "kills")
-makeLive("Nearest", "nearest")
-makeLive("Busy", "busy")
-makeLive("Stun", "stun")
-makeLive("Energy", "energy")
-makeLive("HasBuso", "buso")
-makeLive("Level", "level")
-makeLive("Net remotes", "remotes")
+-- ═══ SCOUT TAB ══════════════════════════════════════════════════════════════
 
-sectionLabel("MODULES.NET (lesen)")
-local remoteCount, remoteText = makeRemotesBox()
-makeButton("Net Remotes aktualisieren", COLORS.limeSoft, function()
-    local lines, count = scanNetRemotes()
-    remoteCount.Text = string.format("Net Remotes: %d", count)
-    remoteText.Text = table.concat(lines, "\n")
+makeToggle("Scout", "Auto-Copy Scout (3s)", "scoutAutoCopy", function(on)
+    ringPush(on and "scout auto-copy ON" or "scout auto-copy OFF")
+    if on then
+        doAutoCopyScout()
+    end
 end)
 
-sectionLabel("SCOUT · ERWEITERN")
-local scoutHint = Instance.new("TextLabel")
-scoutHint.BackgroundColor3 = COLORS.bg
-scoutHint.Size = UDim2.new(1, 0, 0, 40)
-scoutHint.Font = Enum.Font.Gotham
-scoutHint.TextSize = 11
-scoutHint.TextXAlignment = Enum.TextXAlignment.Left
-scoutHint.TextYAlignment = Enum.TextYAlignment.Top
-scoutHint.TextColor3 = COLORS.limeSoft
-scoutHint.TextWrapped = true
-scoutHint.Text = "  Scan → Copy → Dump hier im Chat einfügen → wir erweitern den Script"
-scoutHint.LayoutOrder = nextOrder()
-scoutHint.Parent = body
-do
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 6)
-    c.Parent = scoutHint
-    local p = Instance.new("UIPadding")
-    p.PaddingTop = UDim.new(0, 8)
-    p.PaddingLeft = UDim.new(0, 4)
-    p.PaddingRight = UDim.new(0, 4)
-    p.Parent = scoutHint
-end
+makeTip("Scout", "Alle 3s: Farm-State, nearest, CommF_, Remotes, Busy/Stun, Level, PlaceId → Clipboard.", 52)
 
-local scoutFilter = Instance.new("TextBox")
-scoutFilter.Name = "ScoutFilter"
-scoutFilter.PlaceholderText = "Remote, CommF, Modules.Net, Enemies"
-scoutFilter.Text = ""
-scoutFilter.ClearTextOnFocus = false
-scoutFilter.Size = UDim2.new(1, 0, 0, 32)
-scoutFilter.BackgroundColor3 = COLORS.bg
-scoutFilter.TextColor3 = COLORS.text
-scoutFilter.PlaceholderColor3 = COLORS.muted
-scoutFilter.Font = Enum.Font.Code
-scoutFilter.TextSize = 12
-scoutFilter.TextXAlignment = Enum.TextXAlignment.Left
-scoutFilter.LayoutOrder = nextOrder()
-scoutFilter.Parent = body
+scoutFilterBox = Instance.new("TextBox")
+scoutFilterBox.Name = "ScoutFilter"
+scoutFilterBox.PlaceholderText = "Filter: Remote, CommF, Modules.Net…"
+scoutFilterBox.Text = ""
+scoutFilterBox.ClearTextOnFocus = false
+scoutFilterBox.Size = UDim2.new(1, 0, 0, 40)
+scoutFilterBox.BackgroundColor3 = COLORS.bg
+scoutFilterBox.TextColor3 = COLORS.text
+scoutFilterBox.PlaceholderColor3 = COLORS.muted
+scoutFilterBox.Font = Enum.Font.Code
+scoutFilterBox.TextSize = 13
+scoutFilterBox.TextXAlignment = Enum.TextXAlignment.Left
+scoutFilterBox.LayoutOrder = nextOrder("Scout")
+scoutFilterBox.Parent = parentOf("Scout")
 do
     local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 6)
-    c.Parent = scoutFilter
+    c.CornerRadius = UDim.new(0, 8)
+    c.Parent = scoutFilterBox
     local s = Instance.new("UIStroke")
     s.Color = COLORS.border
     s.Thickness = 1
-    s.Parent = scoutFilter
+    s.Parent = scoutFilterBox
     local pad = Instance.new("UIPadding")
     pad.PaddingLeft = UDim.new(0, 10)
-    pad.Parent = scoutFilter
+    pad.Parent = scoutFilterBox
 end
 
-local scoutStatus = Instance.new("TextLabel")
-scoutStatus.BackgroundTransparency = 1
-scoutStatus.Size = UDim2.new(1, 0, 0, 16)
-scoutStatus.Font = Enum.Font.Gotham
-scoutStatus.TextSize = 11
-scoutStatus.TextXAlignment = Enum.TextXAlignment.Left
-scoutStatus.TextColor3 = COLORS.muted
-scoutStatus.Text = "Scout bereit"
-scoutStatus.LayoutOrder = nextOrder()
-scoutStatus.Parent = body
+scoutStatusLbl = Instance.new("TextLabel")
+scoutStatusLbl.BackgroundTransparency = 1
+scoutStatusLbl.Size = UDim2.new(1, 0, 0, 18)
+scoutStatusLbl.Font = Enum.Font.Gotham
+scoutStatusLbl.TextSize = 12
+scoutStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
+scoutStatusLbl.TextColor3 = COLORS.muted
+scoutStatusLbl.Text = "Scout bereit · Auto-Copy AN"
+scoutStatusLbl.LayoutOrder = nextOrder("Scout")
+scoutStatusLbl.Parent = parentOf("Scout")
 
-local function setScoutStatus(msg, ok)
-    scoutStatus.Text = tostring(msg)
+setScoutStatus = function(msg, ok)
+    scoutStatusLbl.Text = tostring(msg)
     if ok == true then
-        scoutStatus.TextColor3 = COLORS.lime
+        scoutStatusLbl.TextColor3 = COLORS.lime
     elseif ok == false then
-        scoutStatus.TextColor3 = COLORS.danger
+        scoutStatusLbl.TextColor3 = COLORS.danger
     else
-        scoutStatus.TextColor3 = COLORS.muted
+        scoutStatusLbl.TextColor3 = COLORS.muted
     end
 end
 
 local scoutPreviewWrap = Instance.new("Frame")
-scoutPreviewWrap.Size = UDim2.new(1, 0, 0, 120)
+scoutPreviewWrap.Size = UDim2.new(1, 0, 0, 140)
 scoutPreviewWrap.BackgroundColor3 = COLORS.bg
 scoutPreviewWrap.BorderSizePixel = 0
-scoutPreviewWrap.LayoutOrder = nextOrder()
-scoutPreviewWrap.Parent = body
+scoutPreviewWrap.LayoutOrder = nextOrder("Scout")
+scoutPreviewWrap.Parent = parentOf("Scout")
 do
     local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 6)
+    c.CornerRadius = UDim.new(0, 8)
     c.Parent = scoutPreviewWrap
     local s = Instance.new("UIStroke")
     s.Color = COLORS.border
@@ -2056,38 +2402,37 @@ scoutScroll.Size = UDim2.new(1, -10, 1, -8)
 scoutScroll.Position = UDim2.fromOffset(5, 4)
 scoutScroll.BackgroundTransparency = 1
 scoutScroll.BorderSizePixel = 0
-scoutScroll.ScrollBarThickness = 4
+scoutScroll.ScrollBarThickness = 3
 scoutScroll.ScrollBarImageColor3 = COLORS.limeDim
 scoutScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scoutScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 scoutScroll.Parent = scoutPreviewWrap
 
-local scoutPreview = Instance.new("TextLabel")
-scoutPreview.BackgroundTransparency = 1
-scoutPreview.Size = UDim2.new(1, -6, 0, 0)
-scoutPreview.Position = UDim2.fromOffset(2, 0)
-scoutPreview.AutomaticSize = Enum.AutomaticSize.Y
-scoutPreview.Font = Enum.Font.Code
-scoutPreview.TextSize = 10
-scoutPreview.TextXAlignment = Enum.TextXAlignment.Left
-scoutPreview.TextYAlignment = Enum.TextYAlignment.Top
-scoutPreview.TextColor3 = COLORS.muted
-scoutPreview.TextWrapped = true
-scoutPreview.Text = "(noch kein dump — SCAN Explorer)"
-scoutPreview.Parent = scoutScroll
+scoutPreviewLbl = Instance.new("TextLabel")
+scoutPreviewLbl.BackgroundTransparency = 1
+scoutPreviewLbl.Size = UDim2.new(1, -6, 0, 0)
+scoutPreviewLbl.Position = UDim2.fromOffset(2, 0)
+scoutPreviewLbl.AutomaticSize = Enum.AutomaticSize.Y
+scoutPreviewLbl.Font = Enum.Font.Code
+scoutPreviewLbl.TextSize = 10
+scoutPreviewLbl.TextXAlignment = Enum.TextXAlignment.Left
+scoutPreviewLbl.TextYAlignment = Enum.TextYAlignment.Top
+scoutPreviewLbl.TextColor3 = COLORS.muted
+scoutPreviewLbl.TextWrapped = true
+scoutPreviewLbl.Text = "(noch kein dump — SCAN Explorer)"
+scoutPreviewLbl.Parent = scoutScroll
 
 local function setScoutPreview(text)
     local t = tostring(text or "")
-    -- UI truncated; full text kept in lastDumpText for COPY
     if #t > 3500 then
-        scoutPreview.Text = t:sub(1, 3500) .. "\n… (UI truncated — COPY Dump = full)"
+        scoutPreviewLbl.Text = t:sub(1, 3500) .. "\n… (UI truncated — COPY Dump = full)"
     else
-        scoutPreview.Text = t ~= "" and t or "(leer)"
+        scoutPreviewLbl.Text = t ~= "" and t or "(leer)"
     end
 end
 
 local function filteredDumpView()
-    local terms = parseFilterTerms(scoutFilter.Text)
+    local terms = parseFilterTerms(scoutFilterBox.Text)
     if lastDumpText == "" then
         return ""
     end
@@ -2103,16 +2448,16 @@ local function filteredDumpView()
     return table.concat(filtered, "\n")
 end
 
-makeButton("SCAN Explorer", COLORS.lime, function()
+makeButton("Scout", "SCAN Explorer", COLORS.lime, function()
     setScoutStatus("Scanning…", nil)
     task.wait()
-    local view, filteredLines, total = runScoutScan(scoutFilter.Text)
+    local view, filteredLines, total = runScoutScan(scoutFilterBox.Text)
     setScoutPreview(view)
     setScoutStatus(string.format("Scan · %d Zeilen · Ansicht %d", total, #filteredLines), true)
     ringPush("scout scan " .. tostring(total) .. " lines")
 end)
 
-makeButton("COPY Dump", COLORS.limeSoft, function()
+makeButton("Scout", "COPY Dump", COLORS.limeSoft, function()
     if lastDumpText == "" then
         setScoutStatus("Nichts zu kopieren — erst SCAN", false)
         return
@@ -2122,52 +2467,43 @@ makeButton("COPY Dump", COLORS.limeSoft, function()
         text = lastDumpText
     end
     if copyClip(text) then
-        setScoutStatus("kopiert — hier an den Agent schicken", true)
-        notify("DXLTA", "kopiert — hier an den Agent schicken", 3)
+        ST.lastScoutCopy = os.date("%H:%M:%S")
+        setScoutStatus("Dump kopiert @ " .. ST.lastScoutCopy, true)
+        notify("DXLTA", "Dump kopiert — hier pasten", 3)
     else
         setScoutStatus("Clipboard unavailable", false)
     end
 end)
 
-makeButton("COPY Logs", Color3.fromRGB(120, 180, 70), function()
-    local text = ringText()
-    if copyClip(text) then
-        setScoutStatus("Logs kopiert (" .. tostring(#ringLog) .. " Zeilen)", true)
-        notify("DXLTA", "kopiert — hier an den Agent schicken", 3)
+makeButton("Scout", "COPY Logs", Color3.fromRGB(120, 180, 70), function()
+    if copyClip(ringText()) then
+        setScoutStatus("Logs kopiert (" .. tostring(#ringLog) .. ")", true)
+        notify("DXLTA", "Logs kopiert", 2)
     else
         setScoutStatus("Clipboard unavailable", false)
     end
 end)
 
-makeButton("COPY Status", Color3.fromRGB(90, 140, 60), function()
+makeButton("Scout", "COPY Status", Color3.fromRGB(90, 140, 60), function()
     local line = statusOneLiner()
     if copyClip(line) then
         setScoutStatus("Status: " .. line, true)
-        notify("DXLTA", "kopiert — hier an den Agent schicken", 2)
+        notify("DXLTA", "Status kopiert", 2)
     else
         setScoutStatus("Clipboard unavailable", false)
     end
 end)
 
-scoutFilter:GetPropertyChangedSignal("Text"):Connect(function()
+scoutFilterBox:GetPropertyChangedSignal("Text"):Connect(function()
     if lastDumpText ~= "" then
         setScoutPreview(filteredDumpView())
     end
 end)
 
-local footer = Instance.new("TextLabel")
-footer.BackgroundTransparency = 1
-footer.Size = UDim2.new(1, 0, 0, 36)
-footer.Font = Enum.Font.Gotham
-footer.TextSize = 10
-footer.TextXAlignment = Enum.TextXAlignment.Left
-footer.TextColor3 = COLORS.muted
-footer.TextWrapped = true
-footer.Text = "Pfade: workspace.Enemies / Characters / NPCs · RS.Remotes.CommF_ · Flags Busy/Stun/Energy/HasBuso · Scout in-panel"
-footer.LayoutOrder = nextOrder()
-footer.Parent = body
+switchTab("Start")
 
--- Reopen orb
+-- ── Reopen orb ──────────────────────────────────────────────────────────────
+
 local orb = Instance.new("ScreenGui")
 orb.Name = ORB_NAME
 orb.ResetOnSpawn = false
@@ -2178,24 +2514,24 @@ orb.Parent = guiParent
 
 local orbBtn = Instance.new("TextButton")
 orbBtn.Name = "Orb"
-orbBtn.Size = UDim2.fromOffset(48, 48)
-orbBtn.Position = UDim2.new(1, -68, 1, -68)
+orbBtn.Size = UDim2.fromOffset(52, 52)
+orbBtn.Position = UDim2.new(1, -72, 1, -72)
 orbBtn.BackgroundColor3 = COLORS.lime
-orbBtn.TextColor3 = COLORS.bg
+orbBtn.TextColor3 = COLORS.ink
 orbBtn.Font = Enum.Font.GothamBlack
-orbBtn.TextSize = 14
+orbBtn.TextSize = 15
 orbBtn.Text = "DX"
 orbBtn.AutoButtonColor = true
 orbBtn.Parent = orb
-
-local orbCorner = Instance.new("UICorner")
-orbCorner.CornerRadius = UDim.new(1, 0)
-orbCorner.Parent = orbBtn
-
-local orbStroke = Instance.new("UIStroke")
-orbStroke.Color = COLORS.limeDim
-orbStroke.Thickness = 2
-orbStroke.Parent = orbBtn
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(1, 0)
+    c.Parent = orbBtn
+    local s = Instance.new("UIStroke")
+    s.Color = COLORS.limeDim
+    s.Thickness = 2
+    s.Parent = orbBtn
+end
 
 local function setPanelVisible(vis)
     STATE.panelVisible = vis
@@ -2210,7 +2546,7 @@ orbBtn.MouseButton1Click:Connect(function()
     setPanelVisible(true)
 end)
 
--- Drag
+-- Drag panel by header
 do
     local dragging = false
     local dragStart, startPos
@@ -2243,9 +2579,6 @@ do
 end
 
 track(UserInputService.InputBegan:Connect(function(input, gp)
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        keysDown[input.KeyCode] = true
-    end
     if gp then
         return
     end
@@ -2253,48 +2586,13 @@ track(UserInputService.InputBegan:Connect(function(input, gp)
         setPanelVisible(not STATE.panelVisible)
     end
 end))
-track(UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        keysDown[input.KeyCode] = nil
-    end
-end))
 
--- Heartbeat: fly / noclip / pin
+-- Heartbeat: farm pin hold
 track(RunService.Heartbeat:Connect(function()
     if not alive then
         return
     end
     pcall(function()
-        if wantNoclip() then
-            applyNoclip(true)
-        end
-        if STATE.fly then
-            ensureFlyBody()
-            local r = localRoot()
-            if r and flyBV then
-                local dir = flyDir()
-                local spd = math.clamp(tonumber(STATE.flySpeed) or 120, 50, 300)
-                flyBV.Velocity = dir * spd
-                if flyBG then
-                    local cam = Workspace.CurrentCamera
-                    if cam then
-                        flyBG.CFrame = cam.CFrame
-                    end
-                end
-                local h = localHum()
-                if h then
-                    h.PlatformStand = true
-                end
-            end
-        else
-            if flyBV then
-                stopFlyBody()
-                local h = localHum()
-                if h and h.PlatformStand then
-                    h.PlatformStand = false
-                end
-            end
-        end
         if pin then
             if os.clock() > pin.untilT or not pin.root or not pin.root.Parent then
                 pin = nil
@@ -2310,19 +2608,22 @@ track(RunService.Heartbeat:Connect(function()
                 end
             end
         end
+        if STATE.killAura or STATE.farm then
+            stopAttackTracks()
+        end
     end)
 end))
 
--- Kill aura rate loop
+-- Silent aura rate loop
 task.spawn(function()
     while alive do
-        local rate = math.clamp(tonumber(STATE.kaRate) or 4, 1, 12)
+        local rate = math.clamp(tonumber(STATE.kaRate) or 6, 1, 14)
         task.wait(1 / rate)
         pcall(killAuraTick)
     end
 end)
 
--- Farm loop 0.25s
+-- Farm loop
 task.spawn(function()
     while alive do
         task.wait(0.25)
@@ -2333,11 +2634,31 @@ task.spawn(function()
                 ringPush("farm ERR " .. tostring(err):sub(1, 80))
                 warn("[DXLTA] farm: " .. tostring(err))
             end
+        elseif STATE.autoBuso then
+            pcall(tryAutoBuso)
         end
     end
 end)
 
--- Status + ESP
+-- Scout auto-copy every 3s + background logger
+task.spawn(function()
+    while alive do
+        task.wait(3)
+        pcall(function()
+            refreshStatus()
+            local tg = findNearestEnemy(400, nil)
+            if tg then
+                -- keep nearest fresh in ring occasionally
+            end
+            discoverCombatRemotes()
+            if STATE.scoutAutoCopy then
+                doAutoCopyScout()
+            end
+        end)
+    end
+end)
+
+-- Status + ESP refresh
 local accum = 0
 track(RunService.Heartbeat:Connect(function(dt)
     accum += dt
@@ -2370,13 +2691,7 @@ track(RunService.Heartbeat:Connect(function(dt)
             liveLabels.nearest.Text = tostring(ST.nearest)
         end
         if liveLabels.busy then
-            liveLabels.busy.Text = tostring(ST.busy)
-        end
-        if liveLabels.stun then
-            liveLabels.stun.Text = tostring(ST.stun)
-        end
-        if liveLabels.energy then
-            liveLabels.energy.Text = tostring(ST.energy)
+            liveLabels.busy.Text = tostring(ST.busy) .. " / " .. tostring(ST.stun)
         end
         if liveLabels.buso then
             liveLabels.buso.Text = tostring(ST.buso)
@@ -2384,34 +2699,38 @@ track(RunService.Heartbeat:Connect(function(dt)
         if liveLabels.level then
             liveLabels.level.Text = tostring(ST.level)
         end
-        if liveLabels.remotes then
-            liveLabels.remotes.Text = tostring(ST.remotes)
+        if liveLabels.lastScoutCopy then
+            liveLabels.lastScoutCopy.Text = tostring(ST.lastScoutCopy)
         end
     end)
 end))
 
-track(LocalPlayer.CharacterAdded:Connect(function()
-    noclipSaved = {}
-    stopFlyBody()
+track(LocalPlayer.CharacterAdded:Connect(function(char)
     pin = nil
-    task.wait(0.5)
-    if wantNoclip() then
-        applyNoclip(true)
+    task.wait(0.4)
+    hookAnimSuppress(char)
+    if STATE.autoBuso then
+        tryAutoBuso()
     end
 end))
 
+if LocalPlayer.Character then
+    hookAnimSuppress(LocalPlayer.Character)
+end
+
 task.defer(function()
-    local lines, count = scanNetRemotes()
-    remoteCount.Text = string.format("Net Remotes: %d", count)
-    remoteText.Text = table.concat(lines, "\n")
+    pcall(discoverCombatRemotes)
+    pcall(countNetRemotes)
+    if STATE.scoutAutoCopy then
+        doAutoCopyScout()
+    end
 end)
 
 function HUB.unload()
     alive = false
     stopTravel()
     pin = nil
-    stopFlyBody()
-    applyNoclip(false)
+    clearAnimHooks()
     clearAllEsp()
     for _, c in ipairs(connections) do
         pcall(function()
@@ -2436,8 +2755,8 @@ screen.Destroying:Connect(function()
     pcall(HUB.unload)
 end)
 
-notify("DXLTA", "BF Panel ready · RightShift to toggle", 4)
-print("[DXLTA] BF Panel ready — panel.lua loaded")
+notify("DXLTA", "BF Panel v2 · RightShift · FAST FARM", 4)
+print("[DXLTA] BF Panel ready — panel.lua v2 mobile loaded")
 
 end, debug.traceback)
 
