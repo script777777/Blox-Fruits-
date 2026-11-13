@@ -1,6 +1,7 @@
 --[[
-    DXLTA / Void Hub
+    DXLTA / Void Hub  v5.7c
     Renamed from secrethub.lua — live copy for script777777/Blox-Fruits-
+    5.7c: crash-safe boot (no game.__index / no eager namecall)
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/cursor/voidhub-live-ff0d/voidhub.lua"))()
 ]]
@@ -39,7 +40,7 @@ ENV.__VoidHub = {}
 ENV.__SecretHub = ENV.__VoidHub -- legacy alias for older unloaders
 local HUB = ENV.__VoidHub
 HUB.tier = nil -- "free" | "premium" | nil (choose on Start)
-HUB.version = "5.7"
+HUB.version = "5.7c"
 HUB.session = {dodges = 0, saves = 0, kills = 0, learned = 0, blocks = 0, started = os.clock()}
 
 -- =====================================================================
@@ -485,7 +486,7 @@ GV.DEFAULTS = {
     ovrHitbox = true, ovrHitboxAmp = 3, ovrParasite = false, ovrCdStrip = false, ovrSoftGod = false,
     ovrDominion = false, ovrMaps = true, voidSiphon = false,
     ovrMirror = false, ovrMarket = false,
-    combatAim = true, aimCam = true, aimBody = true, aimSilent = true, aimMove = true,
+    combatAim = false, aimCam = true, aimBody = true, aimSilent = false, aimMove = false,
     aimRange = 80, aimFov = 180, aimPlayers = true, aimStick = true,
     antiDeath = true, quietDeath = true,
     bfFruitNotify = true, bfFruitEsp = false, bfFruitSnipe = false, bfChest = false, bfFarm = false, bfQuest = false, bfStats = false,
@@ -512,18 +513,22 @@ if settings.v53 ~= true then settings.v53 = true settings.handsRescue = true end
 -- V2.5 / 5.5 / 5.7: hand models are gone for good — control stays, visuals never come back
 settings.handsVisual = false
 settings.handsPuppet = false
--- 5.7b: PVP aim + anti-death defaults (older saves had aimPlayers off → PVP aim did nothing)
+-- 5.7b kept once; 5.7c: SAFE BOOT — Combat Aim + silent hooks OFF (game.__index hard-closed Roblox)
 if settings.v57b ~= true then
     settings.v57b = true
-    settings.combatAim = true
     settings.aimPlayers = true
     settings.aimCam = true
     settings.aimBody = true
-    settings.aimSilent = true
     settings.aimFov = 180
     settings.aimRange = math.max(tonumber(settings.aimRange) or 55, 80)
     settings.antiDeath = true
     settings.quietDeath = true
+end
+if settings.v57c ~= true then
+    settings.v57c = true
+    settings.combatAim = false
+    settings.aimSilent = false
+    settings.aimMove = false
 end
 settings.handsAlways = false
 settings.introHands = false
@@ -14413,7 +14418,10 @@ CORE.safeModule("14y Void Override", function()
             CORE.log("ERR", "Void Override hook: " .. tostring(err))
         end
     end
-    installHook()
+    -- NEVER install namecall at module load — hard-closes some clients. Lazy on toggle.
+    function OV.ensureHook()
+        if settings.voidOverride == true then installHook() end
+    end
 
     -- restore previously verified paths after scout + seed game maps
     task.defer(function()
@@ -14751,16 +14759,16 @@ CORE.safeModule("14z Combat Aim", function()
         return AIM.why ~= "" and AIM.why or "scanning…"
     end
 
-    -- Silent aim: MUST never throw inside __index (executor/app crash)
+    -- Silent aim: hook Mouse only — NEVER game.__index (that hard-closed Roblox on boot).
     local function installSilent()
         if AIM.spoof or not hookmeta then return end
+        if settings.combatAim ~= true or settings.aimSilent ~= true then return end
         local ok = pcall(function()
-            oldIndex = hookmeta(game, "__index", newcc(function(self, key)
+            oldIndex = hookmeta(mouse, "__index", newcc(function(self, key)
                 local okH, hit = pcall(function()
                     if not (armed() and settings.aimSilent == true) then return nil end
                     local root = AIM.root
                     if not (root and root.Parent) then return nil end
-                    if self ~= mouse then return nil end
                     if key == "Hit" then
                         local p = aimPoint(root)
                         return p and CFrame.new(p) or nil
@@ -14778,14 +14786,17 @@ CORE.safeModule("14z Combat Aim", function()
                     return nil
                 end)
                 if okH and hit ~= nil then return hit end
-                return oldIndex(self, key)
+                if oldIndex then return oldIndex(self, key) end
+                return nil
             end))
         end)
-        AIM.spoof = ok
-        if ok then CORE.log("BOOT", "Combat Aim silent Mouse.Hit online")
+        AIM.spoof = ok == true
+        if ok then CORE.log("BOOT", "Combat Aim silent Mouse.Hit online (mouse mt)")
         else CORE.log("WARN", "Combat Aim: silent aim hook failed — body/camera aim still work") end
     end
-    installSilent()
+    function AIM.ensureSilent()
+        installSilent()
+    end
 
     -- Debounced attack: Tool.Activated + M1 used to spawn 14× loops each → crash/OOM on mobile
     local atkTok, lastAtk = 0, -10
@@ -15727,6 +15738,7 @@ end
 -- 19. Start page
 -- =====================================================================
 GV.NEWS = {
+    {"5.7c", "SAFE BOOT: game no longer closes on start — silent aim hooks Mouse (not game.__index), Void Override namecall is lazy, Combat Aim OFF until you enable it."},
     {"5.7b", "Combat Aim crash fix: safe lookAt, silent-aim never throws, attack debounce, Enemies scan cached/capped — NPC M1 no longer kills the app."},
     {"5.7b", "PVP Combat Aim fixed: Aim at players ON by default, real Players scan, hard camera snap on attack, FOV ignored while attacking, lead on movers."},
     {"5.7b", "Anti-Death (default ON): holds Dead state, Soft God/heal poke, Safe Spot bail. Quiet Death mutes dying smug lines. Toggle OFF to respawn if stuck."},
@@ -16303,11 +16315,16 @@ function H.buildDxlta(parent)
         label(ca, {Size = UDim2.new(1, 0, 0, 56), Text = "On attack (M1 / Z X C V F E / tool): hard-lock nearest target — body + camera snap, Mouse.Hit silent, lead on moving players. PVP needs Aim at players ON (default). Attack ignores FOV so people behind you still lock. Void Needle pulls client-owned mobs onto your blade (BF).",
             TextColor3 = C.sub, TextSize = 11, TextWrapped = true, LayoutOrder = K.nextOrder(), ZIndex = 4})
         K.toggle(ca, "Combat Aim", "combatAim", function(on)
-            if on then toast("Combat Aim on · attack locks nearest player/NPC (hard cam snap)", "shield", 3) end
-        end, "Master switch · nearest enemy in range")
+            if on then
+                if CORE.aim and CORE.aim.ensureSilent then pcall(CORE.aim.ensureSilent) end
+                toast("Combat Aim on · attack locks nearest player/NPC (hard cam snap)", "shield", 3)
+            end
+        end, "Master switch · nearest enemy in range · OFF at boot (safe)")
         K.toggle(ca, "Face body", "aimBody", nil, "Rotate your character toward the target")
         K.toggle(ca, "Aim camera", "aimCam", nil, "Hard camera snap on attack (BF skills often read LookVector)")
-        K.toggle(ca, "Silent Mouse.Hit", "aimSilent", nil, "Skills that read Mouse.Hit land on the enemy")
+        K.toggle(ca, "Silent Mouse.Hit", "aimSilent", function(on)
+            if on and CORE.aim and CORE.aim.ensureSilent then pcall(CORE.aim.ensureSilent) end
+        end, "Skills that read Mouse.Hit · mouse hook only when needed")
         K.toggle(ca, "Void Needle / close gap", "aimMove", nil, "Pull owned mobs onto your blade · else step into melee range")
         K.toggle(ca, "Sticky lock", "aimStick", nil, "Keep aiming while a tool is equipped")
         K.toggle(ca, "Aim at players", "aimPlayers", nil, "ON for PVP · OFF = NPCs / Enemies only")
@@ -16491,10 +16508,11 @@ function H.buildDxlta(parent)
         end
         K.toggle(rl, "Void Override", "voidOverride", function(on)
             if on then
+                if CORE.forge and CORE.forge.ensureHook then pcall(CORE.forge.ensureHook) end
                 toast(HUB.tier == "premium" and "Void Override on · full suite unlocked" or "Learn/Amplify on · Premium unlocks Replay/Probe/Dominion", "shield", 3.5)
                 if CORE.forge and CORE.forge.applyMaps then pcall(CORE.forge.applyMaps) end
             end
-        end, "Master switch")
+        end, "Master switch · hook installs only when you turn this on")
         K.toggle(rl, "Learn remotes", "ovrLearn", nil, "Capture combat remotes as you attack")
         K.toggle(rl, "Amplify damage", "ovrAmplify", nil, "Multiply damage fields en-route to the server")
         K.slider(rl, "Amplify ×", "ovrAmp", 1, 50)
