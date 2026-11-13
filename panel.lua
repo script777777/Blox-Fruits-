@@ -1,20 +1,20 @@
 --[[
-    DXLTA Blox Fruits — Mobile Hub Panel v2.3
-    Premium glass · Fly-to-kill farm · Stream travel · Silent Aura · Client dump
+    DXLTA Blox Fruits — Hub Panel v3.0
+    Sidebar + cards · FAST FARM · Stream travel · Silent Aura · Client dump
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/script777777/Blox-Fruits-/cursor/bf-panel-ff0d/panel.lua"))()
 
-    − = minimize (LEFT lime D orb)  ·  × = unload  ·  RightShift = toggle
+    − = minimize (LEFT D orb)  ·  × = unload  ·  RightShift = toggle
     Locked combat: RegisterAttack(0.5) → RegisterHit(Humanoid)
 ]]
 
-print("[DXLTA] BF Panel boot… v2.3")
+print("[DXLTA] BF Panel boot… v3.0")
 
 local ENV = (type(getgenv) == "function" and getgenv()) or _G
 if ENV.__DXLTA_BF_PANEL and type(ENV.__DXLTA_BF_PANEL.unload) == "function" then
     pcall(ENV.__DXLTA_BF_PANEL.unload)
 end
-ENV.__DXLTA_BF_PANEL = { version = "2.3" }
+ENV.__DXLTA_BF_PANEL = { version = "3.0" }
 local HUB = ENV.__DXLTA_BF_PANEL
 
 local okBoot, bootErr = xpcall(function()
@@ -27,6 +27,7 @@ local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local StarterGui = game:GetService("StarterGui")
+local Stats = game:GetService("Stats")
 local VirtualInputManager
 local VirtualUser
 pcall(function() VirtualUser = game:GetService("VirtualUser") end)
@@ -38,21 +39,26 @@ while not LocalPlayer do
     LocalPlayer = Players.LocalPlayer
 end
 
+-- Soft lime / charcoal — professional, not neon
 local COLORS = {
-    bg = Color3.fromRGB(14, 16, 18),
-    panel = Color3.fromRGB(14, 16, 18),
-    ink = Color3.fromRGB(24, 28, 30),
-    inkDeep = Color3.fromRGB(18, 20, 22),
-    text = Color3.fromRGB(232, 236, 240),
-    muted = Color3.fromRGB(110, 122, 132),
-    lime = Color3.fromRGB(180, 255, 40),
-    limeDim = Color3.fromRGB(90, 140, 20),
-    limeSoft = Color3.fromRGB(150, 210, 55),
-    danger = Color3.fromRGB(255, 90, 90),
-    enemy = Color3.fromRGB(255, 120, 80),
-    npc = Color3.fromRGB(120, 200, 255),
-    player = Color3.fromRGB(200, 140, 255),
-    black = Color3.fromRGB(6, 8, 6),
+    bg = Color3.fromRGB(22, 24, 28),
+    panel = Color3.fromRGB(28, 30, 34),
+    card = Color3.fromRGB(34, 37, 42),
+    cardAlt = Color3.fromRGB(38, 42, 48),
+    sidebar = Color3.fromRGB(18, 20, 24),
+    ink = Color3.fromRGB(42, 46, 52),
+    text = Color3.fromRGB(235, 238, 242),
+    muted = Color3.fromRGB(130, 138, 148),
+    lime = Color3.fromRGB(150, 210, 90),
+    limeDim = Color3.fromRGB(90, 140, 55),
+    limeSoft = Color3.fromRGB(170, 210, 120),
+    limeOn = Color3.fromRGB(40, 56, 36),
+    danger = Color3.fromRGB(220, 90, 90),
+    enemy = Color3.fromRGB(230, 140, 90),
+    npc = Color3.fromRGB(120, 180, 220),
+    player = Color3.fromRGB(180, 150, 220),
+    black = Color3.fromRGB(12, 14, 16),
+    stroke = Color3.fromRGB(55, 60, 68),
 }
 
 local STATE = {
@@ -64,7 +70,7 @@ local STATE = {
     fastFarm = false,
     kaRange = 22,
     kaRate = 8,
-    bfSpeed = 220,
+    bfSpeed = 240,
     enemyEsp = false,
     npcEsp = false,
     playerEsp = false,
@@ -82,12 +88,19 @@ local ST = {
     buso = "—",
     level = "—",
     remotes = "—",
-    lastCopy = "noch nie",
+    lastCopy = "—",
+    fps = "—",
+    ping = "—",
+    session = "00:00",
 }
 
 local ESP_FOLDER_NAME = "DXLTA_ESP"
 local GUI_NAME = "DXLTA_BF_Panel"
 local ORB_NAME = "DXLTA_BF_Orb"
+local SIDEBAR_W = 148
+local MOBILE_BREAK = 700
+local PIN_DIST = 8
+local VERSION = "3.0"
 
 local connections = {}
 local enemyEspMap = {}
@@ -111,8 +124,9 @@ local farmCurrentName = nil
 local lastStreamAt = 0
 local farmBusy = false
 local lastAttackAt = 0
+local sessionStart = os.clock()
+local fpsAccum, fpsFrames, fpsValue = 0, 0, 0
 
--- LOCKED from real user logs — do not probe other patterns
 local combatLocked = {
     attackArg = 0.5,
     hitKind = "hum",
@@ -126,16 +140,20 @@ local lastDumpText = ""
 local lastDumpLines = {}
 
 local liveLabels = {}
-local statusBlockLbl
 local tabPages = {}
 local tabButtons = {}
-local currentTab = "Start"
+local currentTab = "Home"
+local pageTitleLbl
 local clientStatusLbl
-local scoutFilterBox
-local scoutPreviewLbl
 local setClientStatus
 local togglePainters = {}
 local rememberRemote
+local mobileMode = false
+local sidebarFrame
+local contentFrame
+local navScroll
+local brandBlock
+local panelRoot
 
 local function track(conn)
     if conn then
@@ -349,12 +367,27 @@ local function findRemoteByName(folder, name)
     return nil
 end
 
+-- HARDCODED locked combat remotes (proven dumps)
 local function getRegisterAttack()
+    local net = getNetFolder()
+    if net then
+        local r = net:FindFirstChild("RE/RegisterAttack") or net["RE/RegisterAttack"]
+        if r then
+            return r
+        end
+    end
     return findRemoteByName(getNetFolder(), "RE/RegisterAttack")
         or findRemoteByName(getNetFolder(), "RegisterAttack")
 end
 
 local function getRegisterHit()
+    local net = getNetFolder()
+    if net then
+        local r = net:FindFirstChild("RE/RegisterHit") or net["RE/RegisterHit"]
+        if r then
+            return r
+        end
+    end
     return findRemoteByName(getNetFolder(), "RE/RegisterHit")
         or findRemoteByName(getNetFolder(), "RegisterHit")
 end
@@ -380,7 +413,6 @@ local function findStreamRemote()
     if r then
         return r
     end
-    -- deep scan common roots once
     local roots = { ReplicatedStorage, Workspace }
     for _, root in ipairs(roots) do
         local ok, found = pcall(function()
@@ -447,7 +479,7 @@ end
 
 local function ringText(limit)
     if #ringLog == 0 then
-        return "(keine logs — farm/quest/aura starten)"
+        return "(no logs — start farm/quest/aura)"
     end
     if limit and #ringLog > limit then
         local slice = {}
@@ -461,7 +493,7 @@ end
 
 local function errorText()
     if #errorRing == 0 then
-        return "(keine errors)"
+        return "(no errors)"
     end
     return table.concat(errorRing, "\n")
 end
@@ -538,8 +570,6 @@ local function discoverCombatRemotes()
                     or string.find(n, "attack", 1, true)
                     or string.find(n, "hit", 1, true)
                     or string.find(n, "register", 1, true)
-                    or string.find(n, "shoot", 1, true)
-                    or string.find(n, "damage", 1, true)
                     or string.find(n, "stream", 1, true)
                     or n == "re" then
                     table.insert(found, c)
@@ -824,7 +854,60 @@ local function clearAllEsp()
     enemyEspMap, npcEspMap, playerEspMap = {}, {}, {}
 end
 
--- ── Status ──────────────────────────────────────────────────────────────────
+-- ── Status / metrics ────────────────────────────────────────────────────────
+
+local function formatSession(sec)
+    sec = math.max(0, math.floor(sec))
+    local m = math.floor(sec / 60)
+    local s = sec % 60
+    if m >= 60 then
+        local h = math.floor(m / 60)
+        m = m % 60
+        return string.format("%d:%02d:%02d", h, m, s)
+    end
+    return string.format("%02d:%02d", m, s)
+end
+
+local function readPing()
+    local ping = nil
+    pcall(function()
+        if LocalPlayer and type(LocalPlayer.GetNetworkPing) == "function" then
+            ping = LocalPlayer:GetNetworkPing()
+        end
+    end)
+    if type(ping) == "number" then
+        -- GetNetworkPing returns seconds
+        if ping < 5 then
+            return string.format("%dms", math.floor(ping * 1000 + 0.5))
+        end
+        return string.format("%dms", math.floor(ping + 0.5))
+    end
+    pcall(function()
+        local net = Stats:FindFirstChild("Network")
+        local serverStats = net and net:FindFirstChild("ServerStatsItem")
+        local item = serverStats and (serverStats:FindFirstChild("Data Ping") or serverStats:FindFirstChild("Ping"))
+        if item and item.GetValueString then
+            ping = item:GetValueString()
+        end
+    end)
+    if type(ping) == "string" and ping ~= "" then
+        return ping
+    end
+    return "—"
+end
+
+local function readMem()
+    local mb = nil
+    pcall(function()
+        if Stats and type(Stats.GetTotalMemoryUsageMb) == "function" then
+            mb = Stats:GetTotalMemoryUsageMb()
+        end
+    end)
+    if type(mb) == "number" then
+        return string.format("%.0f MB", mb)
+    end
+    return "—"
+end
 
 local function refreshStatus()
     pcall(function()
@@ -839,7 +922,7 @@ local function refreshStatus()
         end
         local busyVal = char:FindFirstChild("Busy")
         if busyVal and busyVal:IsA("BoolValue") then
-            ST.busy = busyVal.Value and "JA" or "NEIN"
+            ST.busy = busyVal.Value and "YES" or "NO"
         elseif busyVal then
             ST.busy = tostring(busyVal.Value ~= nil and busyVal.Value or busyVal)
         else
@@ -854,18 +937,17 @@ local function refreshStatus()
         local energyVal = char:FindFirstChild("Energy")
         if energyVal and (energyVal:IsA("NumberValue") or energyVal:IsA("IntValue")) then
             ST.energy = string.format("%.0f", energyVal.Value)
-        elseif energyVal then
-            local n = energyVal:FindFirstChildWhichIsA("NumberValue") or energyVal:FindFirstChildWhichIsA("IntValue")
-            ST.energy = n and string.format("%.0f", n.Value) or "vorhanden"
         else
             ST.energy = "—"
         end
-        local hasBuso = char:FindFirstChild("HasBuso")
-        ST.buso = hasBuso and "JA" or "NEIN"
+        ST.buso = char:FindFirstChild("HasBuso") and "YES" or "NO"
     end)
     pcall(function()
         ST.remotes = tostring(countNetRemotes())
     end)
+    ST.ping = readPing()
+    ST.fps = tostring(math.floor(fpsValue + 0.5))
+    ST.session = formatSession(os.clock() - sessionStart)
     if not STATE.farm and not STATE.killAura then
         local tg, d = findNearestEnemy(nil, nil)
         ST.nearest = tg and string.format("%s · %dm", tg.name, math.floor(d or 0)) or "—"
@@ -885,20 +967,6 @@ local function seaLabel()
 end
 
 local function detectExecutor()
-    local names = {
-        "identifyexecutor", "getexecutorname", "ExecutorName",
-    }
-    for _, n in ipairs(names) do
-        local fn = rawget(_G, n) or (type(getgenv) == "function" and rawget(getgenv(), n))
-        if type(fn) == "function" then
-            local ok, res = pcall(fn)
-            if ok and res then
-                return tostring(res)
-            end
-        elseif type(fn) == "string" then
-            return fn
-        end
-    end
     if type(identifyexecutor) == "function" then
         local ok, res = pcall(identifyexecutor)
         if ok and res then
@@ -930,23 +998,7 @@ local function statusOneLiner()
     )
 end
 
-local function statusBlockText()
-    local flags = (STATE.farm and "ON" or "OFF")
-        .. (STATE.fastFarm and " · FAST" or "")
-        .. (STATE.killAura and " · aura" or "")
-        .. (STATE.autoQuest and " · quest" or "")
-    return string.format(
-        "LV %s · kills %s · buso %s\nnear  %s\nfarm  %s\n%s",
-        tostring(ST.level),
-        tostring(ST.kills),
-        tostring(ST.buso),
-        tostring(ST.nearest),
-        tostring(ST.farm),
-        flags
-    )
-end
-
--- ── Client dump / Scout scan ────────────────────────────────────────────────
+-- ── Client dump ─────────────────────────────────────────────────────────────
 
 local function getFullPath(inst)
     if not inst then
@@ -985,86 +1037,9 @@ local function childSummary(parent, limit)
     return #names > 0 and table.concat(names, ", ") or "(empty)"
 end
 
-local function parseFilterTerms(raw)
-    local terms = {}
-    for part in tostring(raw or ""):gmatch("[^,%s]+") do
-        if part ~= "" then
-            table.insert(terms, string.lower(part))
-        end
-    end
-    return terms
-end
-
-local function lineMatchesFilter(line, terms)
-    if not terms or #terms == 0 then
-        return true
-    end
-    local low = string.lower(tostring(line))
-    for _, t in ipairs(terms) do
-        if string.find(low, t, 1, true) then
-            return true
-        end
-    end
-    return false
-end
-
-local function shouldListScout(inst)
-    if not inst then
-        return false
-    end
-    local n = string.lower(inst.Name)
-    local cls = inst.ClassName
-    if cls == "RemoteEvent" or cls == "RemoteFunction" or cls == "UnreliableRemoteEvent" then
-        return true
-    end
-    if string.find(n, "remote", 1, true)
-        or string.find(n, "comm", 1, true)
-        or string.find(n, "register", 1, true)
-        or string.find(n, "attack", 1, true)
-        or string.find(n, "hit", 1, true)
-        or string.find(n, "net", 1, true)
-        or string.find(n, "quest", 1, true)
-        or string.find(n, "stream", 1, true) then
-        return true
-    end
-    return false
-end
-
-local function dumpTree(root, lines, depth, maxDepth, maxLines)
-    if not root or depth > maxDepth or #lines >= maxLines then
-        return
-    end
-    local path = getFullPath(root)
-    if shouldListScout(root) then
-        table.insert(lines, string.format("%s | %s", root.ClassName, path))
-    end
-    local ok, kids = pcall(function()
-        return root:GetChildren()
-    end)
-    if not ok or not kids then
-        return
-    end
-    local pri, rest = {}, {}
-    for _, c in ipairs(kids) do
-        if shouldListScout(c) then
-            table.insert(pri, c)
-        else
-            table.insert(rest, c)
-        end
-    end
-    for _, c in ipairs(pri) do
-        dumpTree(c, lines, depth + 1, maxDepth, maxLines)
-    end
-    for _, c in ipairs(rest) do
-        if depth < 2 then
-            dumpTree(c, lines, depth + 1, maxDepth, maxLines)
-        end
-    end
-end
-
 local function buildClientDump()
     local lines = {}
-    table.insert(lines, "========== DXLTA CLIENT DUMP v2.3 ==========")
+    table.insert(lines, "========== DXLTA CLIENT DUMP v" .. VERSION .. " ==========")
     table.insert(lines, string.format(
         "PlaceId=%s  GameId=%s  JobId=%s  Sea=%s",
         tostring(game.PlaceId),
@@ -1097,22 +1072,7 @@ local function buildClientDump()
         combatLocked.attackArg,
         tostring(combatLocked.useRemotes)
     ))
-
-    local data = LocalPlayer:FindFirstChild("Data")
-    table.insert(lines, "Data children: " .. childSummary(data, 80))
-    local stats = data and (data:FindFirstChild("Stats") or data:FindFirstChild("Stat") or data:FindFirstChild("stats"))
-    if stats then
-        table.insert(lines, "Stats folder: " .. childSummary(stats, 60))
-        local ok, kids = pcall(function() return stats:GetChildren() end)
-        if ok and kids then
-            for _, s in ipairs(kids) do
-                local okv, val = pcall(function() return s.Value end)
-                if okv then
-                    table.insert(lines, string.format("  Stat.%s = %s", s.Name, tostring(val)))
-                end
-            end
-        end
-    end
+    table.insert(lines, string.format("FPS=%s  Ping=%s  Mem=%s  Session=%s", ST.fps, ST.ping, readMem(), ST.session))
 
     local char = localChar()
     table.insert(lines, "Character children: " .. childSummary(char, 80))
@@ -1129,8 +1089,6 @@ local function buildClientDump()
             end
         end
         table.insert(lines, "Backpack tools: " .. (#tools > 0 and table.concat(tools, ", ") or "(none)"))
-    else
-        table.insert(lines, "Backpack tools: (no backpack)")
     end
 
     local ra = getRegisterAttack()
@@ -1144,28 +1102,6 @@ local function buildClientDump()
         findStreamRemote() and "yes" or "Player:RequestStreamAroundAsync"
     ))
     table.insert(lines, "Modules.Net: " .. childSummary(getNetFolder(), 80))
-    table.insert(lines, "RS.Remotes: " .. childSummary(getRemotesFolder(), 80))
-
-    local disc = {}
-    for path, cls in pairs(discoveredRemotes) do
-        table.insert(disc, cls .. " " .. path)
-    end
-    table.sort(disc)
-    table.insert(lines, "Discovered remotes: " .. (#disc > 0 and table.concat(disc, " | ") or "(none yet)"))
-
-    local sample = {}
-    local folder = getEnemiesFolder()
-    if folder then
-        local kids = folder:GetChildren()
-        for i, m in ipairs(kids) do
-            if i > 25 then
-                table.insert(sample, "…+" .. tostring(#kids - 25))
-                break
-            end
-            table.insert(sample, m.Name)
-        end
-    end
-    table.insert(lines, "workspace.Enemies sample: " .. (#sample > 0 and table.concat(sample, ", ") or "(none)"))
     table.insert(lines, "============================================")
     return table.concat(lines, "\n")
 end
@@ -1178,27 +1114,6 @@ local function buildCombatRemotesTrim()
     table.insert(lines, "RegisterAttack=" .. (ra and ra:GetFullName() or "MISSING"))
     table.insert(lines, "RegisterHit=" .. (rh and rh:GetFullName() or "MISSING"))
     table.insert(lines, "LOCKED: FireServer(0.5) → FireServer(hum)")
-    local stream = findStreamRemote()
-    table.insert(lines, "RequestStreamAroundAsync=" .. (stream and stream:GetFullName() or "Player method / missing"))
-    local combatHints = { "register", "attack", "hit", "combat", "damage", "buso", "stream", "quest", "comm" }
-    local disc = {}
-    for path, cls in pairs(discoveredRemotes) do
-        local low = string.lower(path)
-        for _, hint in ipairs(combatHints) do
-            if string.find(low, hint, 1, true) then
-                table.insert(disc, cls .. " " .. path)
-                break
-            end
-        end
-    end
-    table.sort(disc)
-    for i, d in ipairs(disc) do
-        if i > 24 then
-            table.insert(lines, "…+" .. tostring(#disc - 24))
-            break
-        end
-        table.insert(lines, d)
-    end
     return table.concat(lines, "\n")
 end
 
@@ -1211,19 +1126,11 @@ local function buildRemotesSummary()
     table.insert(lines, "RegisterHit=" .. (rh and rh:GetFullName() or "MISSING"))
     table.insert(lines, "LOCKED: FireServer(0.5) → FireServer(hum)")
     table.insert(lines, "Modules.Net: " .. childSummary(getNetFolder(), 60))
-    local disc = {}
-    for path, cls in pairs(discoveredRemotes) do
-        table.insert(disc, cls .. " " .. path)
-    end
-    table.sort(disc)
-    for _, d in ipairs(disc) do
-        table.insert(lines, d)
-    end
     return table.concat(lines, "\n")
 end
 
 local function buildAllBundle()
-    local parts = {
+    return table.concat({
         buildClientDump(),
         "",
         "----- ERRORS -----",
@@ -1233,14 +1140,12 @@ local function buildAllBundle()
         ringText(),
         "",
         buildRemotesSummary(),
-    }
-    return table.concat(parts, "\n")
+    }, "\n")
 end
 
--- Mobile-friendly auto-copy: combat remotes + last 40 logs (pasteable)
 local function buildAutoCopyBundle()
-    local parts = {
-        "========== DXLTA AUTO v2.3 ==========",
+    return table.concat({
+        "========== DXLTA AUTO v" .. VERSION .. " ==========",
         statusOneLiner(),
         "FarmState=" .. tostring(ST.farm) .. "  Nearest=" .. tostring(ST.nearest) .. "  Kills=" .. tostring(ST.kills),
         string.format(
@@ -1259,55 +1164,7 @@ local function buildAutoCopyBundle()
         "",
         "----- LOGS (last 40) -----",
         ringText(40),
-    }
-    return table.concat(parts, "\n")
-end
-
-local function runScoutScan(filterRaw)
-    local lines = {}
-    table.insert(lines, "========== DXLTA SCAN ==========")
-    table.insert(lines, statusOneLiner())
-    local remotes = getRemotesFolder()
-    if remotes then
-        table.insert(lines, "")
-        table.insert(lines, "### ReplicatedStorage.Remotes ###")
-        dumpTree(remotes, lines, 0, 4, 1200)
-    end
-    local modules = ReplicatedStorage:FindFirstChild("Modules")
-    if modules then
-        table.insert(lines, "")
-        table.insert(lines, "### ReplicatedStorage.Modules ###")
-        dumpTree(modules, lines, 0, 4, 1800)
-    end
-    local enemies = getEnemiesFolder()
-    if enemies then
-        table.insert(lines, "")
-        table.insert(lines, "### workspace.Enemies (shallow) ###")
-        for _, m in ipairs(enemies:GetChildren()) do
-            if #lines > 2800 then
-                break
-            end
-            table.insert(lines, string.format("%s | %s", m.ClassName, getFullPath(m)))
-        end
-    end
-    table.insert(lines, "")
-    table.insert(lines, string.format("========== END (%d lines) ==========", #lines + 1))
-    if #lines > 3000 then
-        table.insert(lines, "... TRUNCATED ...")
-    end
-    lastDumpLines = lines
-    lastDumpText = table.concat(lines, "\n")
-    local terms = parseFilterTerms(filterRaw)
-    if #terms == 0 then
-        return lastDumpText, lines, #lines
-    end
-    local filtered = {}
-    for _, line in ipairs(lines) do
-        if lineMatchesFilter(line, terms) then
-            table.insert(filtered, line)
-        end
-    end
-    return table.concat(filtered, "\n"), filtered, #lines
+    }, "\n")
 end
 
 local function doAutoCopyAll()
@@ -1328,7 +1185,7 @@ local function doAutoCopyAll()
     return false
 end
 
--- ── Noclip during travel ────────────────────────────────────────────────────
+-- ── Travel / noclip ─────────────────────────────────────────────────────────
 
 local function setTravelNoclip(on)
     local char = localChar()
@@ -1373,12 +1230,9 @@ local function enemyAttackSpot(tg)
     else
         fl = fl.Unit
     end
-    -- goal = enemy.Pos - flatLook*5 + (0,5,0)
     return tg.root.Position - fl * 5 + Vector3.new(0, 5, 0)
 end
 
--- destOrFn: Vector3 or function() -> Vector3 (live behind-enemy spot)
--- Long-range: 220 studs/s HRP tween + stream + chunk teleport on stall
 local function travelTo(destOrFn, label, keep)
     local r, h = localRoot(), localHum()
     local function resolveDest()
@@ -1397,7 +1251,8 @@ local function travelTo(destOrFn, label, keep)
     end
     travelTok += 1
     local tok = travelTok
-    ST.farm = "flug → " .. tostring(label or "travel")
+    ST.farm = "travel → " .. tostring(label or "goal")
+    ringPush("travel start → " .. tostring(label or "goal"))
     setTravelNoclip(true)
     local stuckAt = r.Position
     local stuckSince = os.clock()
@@ -1422,27 +1277,26 @@ local function travelTo(destOrFn, label, keep)
                 return
             end
             dest = resolveDest() or dest
-            local speed = math.clamp(tonumber(STATE.bfSpeed) or 220, 180, 280)
+            local speed = math.clamp(tonumber(STATE.bfSpeed) or 240, 120, 320)
             local d = dest - r.Position
             local dist = d.Magnitude
 
-            -- stream while traveling far so enemies load in
-            if dist > 10 then
+            if dist > PIN_DIST then
                 if (dest - lastStreamPos).Magnitude > 8 or os.clock() - lastStreamAt >= 0.5 then
                     requestStreamAround(dest)
                     lastStreamPos = dest
                 end
             end
 
-            if dist <= 10 then
+            if dist <= PIN_DIST then
                 okArrived = true
                 broke = true
                 return
             end
 
-            -- no progress 2.5s → chunk teleport min(80, dist-8)
+            -- stuck 2s → chunk hop
             if (r.Position - stuckAt).Magnitude < 2.5 then
-                if os.clock() - stuckSince > 2.5 then
+                if os.clock() - stuckSince > 2 then
                     local hopDist = math.min(80, math.max(8, dist - 8))
                     local hop = r.Position + d.Unit * hopDist
                     pcall(function()
@@ -1452,7 +1306,7 @@ local function travelTo(destOrFn, label, keep)
                         r.AssemblyAngularVelocity = Vector3.zero
                     end)
                     requestStreamAround(dest)
-                    ringPush(string.format("chunk-tp %.0fm → %s", hopDist, tostring(label)))
+                    ringPush(string.format("chunk-hop %.0fm → %s", hopDist, tostring(label)))
                     stuckAt = hop
                     stuckSince = os.clock()
                 end
@@ -1495,10 +1349,13 @@ local function travelTo(destOrFn, label, keep)
     if tok == travelTok then
         setTravelNoclip(false)
     end
+    if okArrived then
+        ringPush("arrive → " .. tostring(label or "goal"))
+    end
     return okArrived
 end
 
--- ── Silent combat / animation suppress ──────────────────────────────────────
+-- ── Silent combat ───────────────────────────────────────────────────────────
 
 local ATTACK_ANIM_HINTS = {
     "attack", "slash", "punch", "m1", "combat", "swing", "hit", "melee", "combo", "strike",
@@ -1609,7 +1466,6 @@ local function hookAnimSuppress(char)
     end
 end
 
--- ALWAYS equip Godhuman (ToolTip==Melee or Name==Godhuman) every attack cycle
 local function equipMeleeTool()
     local c, h = localChar(), localHum()
     if not (c and h) then
@@ -1673,7 +1529,6 @@ local function equipMeleeTool()
         return pick
     end
 
-    -- last resort: any non-fruit tool
     if bp then
         for _, t in ipairs(bp:GetChildren()) do
             if t:IsA("Tool") then
@@ -1690,7 +1545,6 @@ local function equipMeleeTool()
     return held
 end
 
--- LOCKED: RegisterAttack(0.5)
 local function fireRegisterAttack()
     local rem = getRegisterAttack()
     if not rem then
@@ -1717,7 +1571,6 @@ local function readEnemyHp(tg)
     return ok and hp or nil
 end
 
--- LOCKED: RegisterHit(Humanoid)
 local function fireRegisterHit(tg)
     local rem = getRegisterHit()
     if not rem or not tg or not tg.hum then
@@ -1733,12 +1586,13 @@ local function fireRegisterHit(tg)
         errorPush("RegisterHit(hum): " .. tostring(err):sub(1, 80))
         return false
     end
+    ringPush("hit " .. tostring(tg.name or "enemy"))
     if beforeHp then
         task.delay(0.15, function()
             local after = readEnemyHp(tg)
             if after and after < beforeHp - 0.5 then
                 ringPush(string.format(
-                    "hit hum −%.0f (%.0f→%.0f)",
+                    "hit −%.0f (%.0f→%.0f)",
                     beforeHp - after,
                     beforeHp,
                     after
@@ -1816,14 +1670,11 @@ local function watchKill(tg)
         end
         ST.kills += 1
         ringPush("kill " .. tostring(name))
-        -- clear pin so next target is picked immediately
         pin = nil
         farmCurrentName = nil
     end)
     track(c)
 end
-
--- ── Mob Pull ────────────────────────────────────────────────────────────────
 
 local function isNetOwner(part)
     if not part then
@@ -1863,8 +1714,6 @@ local function pullNearbyMobs(center, range)
     end
 end
 
--- ── Auto Buso — skip if HasBuso folder exists ───────────────────────────────
-
 local function tryAutoBuso()
     if not STATE.autoBuso then
         return
@@ -1874,7 +1723,7 @@ local function tryAutoBuso()
         return
     end
     if char:FindFirstChild("HasBuso") then
-        ST.buso = "JA"
+        ST.buso = "YES"
         return
     end
     if os.clock() - lastBusoTry < 2.5 then
@@ -1893,8 +1742,6 @@ local function tryAutoBuso()
         ringPush("Buso key J fallback")
     end
 end
-
--- ── Kill Aura ───────────────────────────────────────────────────────────────
 
 local function killAuraTick()
     if not STATE.killAura and not STATE.farm then
@@ -1928,7 +1775,7 @@ local function killAuraTick()
     attackOnceSilent(tg)
 end
 
--- ── Quests (Sea 1) ──────────────────────────────────────────────────────────
+-- ── Quests ──────────────────────────────────────────────────────────────────
 
 local Q1 = {
     { 0, "BanditQuest1", 1, "Bandit" },
@@ -2094,9 +1941,8 @@ local function tryAutoQuest()
             notify("DXLTA", "StartQuest " .. plan[2] .. " #" .. tostring(plan[3]), 2)
             return
         end
-        ringPush("quest CommF_ failed · fallback prompt")
+        ringPush("quest CommF_ soft-fail · continue farm")
     else
-        -- PlaceId unknown / high level → always farm nearest workspace.Enemies
         ringPush("quest: no Sea1 plan · sea=" .. seaLabel() .. " · farm nearest")
         farmTargetName = nil
     end
@@ -2116,7 +1962,7 @@ local function tryAutoQuest()
     end
 end
 
--- ── Auto Farm — fly to enemy and kill ───────────────────────────────────────
+-- ── Auto Farm ───────────────────────────────────────────────────────────────
 
 local function farmStep()
     if farmBusy then
@@ -2126,7 +1972,7 @@ local function farmStep()
     local okOuter, errOuter = pcall(function()
         local r, h = localRoot(), localHum()
         if not (r and h) then
-            ST.farm = "warte auf Character"
+            ST.farm = "waiting for character"
             return
         end
         if h.Health <= 0 then
@@ -2140,7 +1986,6 @@ local function farmStep()
             pcall(tryAutoQuest)
         end
 
-        -- Always farm nearest workspace.Enemies (Health>0)
         local tg, d = findNearestEnemy(nil, nil)
         if farmTargetName then
             local filtered, fd = findNearestEnemy(nil, farmTargetName)
@@ -2150,7 +1995,7 @@ local function farmStep()
         end
 
         if not tg then
-            ST.farm = "warte auf Enemies"
+            ST.farm = "waiting for Enemies"
             ST.nearest = "—"
             pin = nil
             farmCurrentName = nil
@@ -2167,9 +2012,9 @@ local function farmStep()
             return
         end
 
-        if d > 10 then
+        if d > PIN_DIST then
             pin = nil
-            ST.farm = string.format("flug → %s %.0fm", tg.name, d or 0)
+            ST.farm = string.format("travel → %s %.0fm", tg.name, d or 0)
             if farmCurrentName ~= tg.name then
                 farmCurrentName = tg.name
                 ringPush(string.format("travel → %s @%dm", tg.name, math.floor(d or 0)))
@@ -2189,12 +2034,11 @@ local function farmStep()
                 end
                 return true
             end)
-            -- after travel: if still far, hard set closer once
             r = localRoot()
             if r and tg.hum and tg.hum.Health > 0 then
                 spot = enemyAttackSpot(tg) or spot
                 local nd = (r.Position - tg.root.Position).Magnitude
-                if nd > 10 then
+                if nd > PIN_DIST then
                     pcall(function()
                         setTravelNoclip(true)
                         r.CFrame = safeLookAt(spot, tg.root.Position)
@@ -2207,7 +2051,6 @@ local function farmStep()
             return
         end
 
-        -- Within ≤10 studs: pin behind, equip Godhuman, attack ~8/s
         watchKill(tg)
         farmCurrentName = tg.name
         spot = enemyAttackSpot(tg) or spot
@@ -2275,17 +2118,16 @@ local function applyFastFarm(on)
         STATE.farm = true
         STATE.autoQuest = true
         STATE.killAura = true
-        -- buso only if not already HasBuso
         local char = localChar()
         if not (char and char:FindFirstChild("HasBuso")) then
             STATE.autoBuso = true
         else
             STATE.autoBuso = false
-            ST.buso = "JA"
+            ST.buso = "YES"
         end
         ST.farm = "FAST FARM"
         ringPush("FAST FARM ON")
-        notify("DXLTA", "FAST FARM — flug + kill", 3)
+        notify("DXLTA", "FAST FARM — farm + quest + aura + buso", 3)
         hookAnimSuppress(localChar())
     else
         STATE.farm = false
@@ -2305,7 +2147,9 @@ local function refreshToggleUIs()
     end
 end
 
--- ── UI ──────────────────────────────────────────────────────────────────────
+-- ═══════════════════════════════════════════════════════════════════════════
+-- UI — left sidebar + cards, branded DXLTA
+-- ═══════════════════════════════════════════════════════════════════════════
 
 local guiParent = getGuiParent()
 destroyByName(guiParent, GUI_NAME)
@@ -2319,96 +2163,140 @@ screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screen.DisplayOrder = 1000
 screen.Parent = guiParent
 
-local panel = Instance.new("Frame")
-panel.Name = "Panel"
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-panel.Size = UDim2.fromScale(0.9, 0.55)
-panel.Position = UDim2.fromScale(0.5, 0.5)
-panel.BackgroundColor3 = COLORS.bg
-panel.BorderSizePixel = 0
-panel.ClipsDescendants = true
-panel.Parent = screen
+panelRoot = Instance.new("Frame")
+panelRoot.Name = "Panel"
+panelRoot.AnchorPoint = Vector2.new(0.5, 0.5)
+panelRoot.Size = UDim2.fromOffset(720, 460)
+panelRoot.Position = UDim2.fromScale(0.5, 0.5)
+panelRoot.BackgroundColor3 = COLORS.bg
+panelRoot.BorderSizePixel = 0
+panelRoot.ClipsDescendants = true
+panelRoot.Parent = screen
 
 do
     local lim = Instance.new("UISizeConstraint")
-    lim.MaxSize = Vector2.new(420, 520)
-    lim.MinSize = Vector2.new(280, 360)
-    lim.Parent = panel
+    lim.MaxSize = Vector2.new(820, 560)
+    lim.MinSize = Vector2.new(320, 380)
+    lim.Parent = panelRoot
 end
 
 local panelCorner = Instance.new("UICorner")
-panelCorner.CornerRadius = UDim.new(0, 16)
-panelCorner.Parent = panel
+panelCorner.CornerRadius = UDim.new(0, 14)
+panelCorner.Parent = panelRoot
 
 local panelStroke = Instance.new("UIStroke")
-panelStroke.Color = COLORS.lime
+panelStroke.Color = COLORS.stroke
 panelStroke.Thickness = 1
-panelStroke.Transparency = 0.55
-panelStroke.Parent = panel
+panelStroke.Transparency = 0.25
+panelStroke.Parent = panelRoot
 
--- subtle glass gradient
-local panelGrad = Instance.new("UIGradient")
-panelGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 22, 24)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 16)),
-})
-panelGrad.Rotation = 110
-panelGrad.Parent = panel
+-- LEFT SIDEBAR
+sidebarFrame = Instance.new("Frame")
+sidebarFrame.Name = "Sidebar"
+sidebarFrame.Size = UDim2.new(0, SIDEBAR_W, 1, 0)
+sidebarFrame.BackgroundColor3 = COLORS.sidebar
+sidebarFrame.BorderSizePixel = 0
+sidebarFrame.Parent = panelRoot
 
--- Header bar 40px
-local HEADER_H = 40
-local header = Instance.new("Frame")
-header.Name = "Header"
-header.Size = UDim2.new(1, 0, 0, HEADER_H)
-header.BackgroundColor3 = COLORS.inkDeep
-header.BorderSizePixel = 0
-header.Parent = panel
+brandBlock = Instance.new("Frame")
+brandBlock.Name = "Brand"
+brandBlock.Size = UDim2.new(1, 0, 0, 64)
+brandBlock.BackgroundTransparency = 1
+brandBlock.Parent = sidebarFrame
 
-local headerCorner = Instance.new("UICorner")
-headerCorner.CornerRadius = UDim.new(0, 16)
-headerCorner.Parent = header
+local brandTitle = Instance.new("TextLabel")
+brandTitle.BackgroundTransparency = 1
+brandTitle.Position = UDim2.fromOffset(14, 14)
+brandTitle.Size = UDim2.new(1, -20, 0, 22)
+brandTitle.Font = Enum.Font.GothamBlack
+brandTitle.TextSize = 18
+brandTitle.TextXAlignment = Enum.TextXAlignment.Left
+brandTitle.TextColor3 = COLORS.lime
+brandTitle.Text = "DXLTA"
+brandTitle.Parent = brandBlock
 
-local headerFix = Instance.new("Frame")
-headerFix.Size = UDim2.new(1, 0, 0, 14)
-headerFix.Position = UDim2.new(0, 0, 1, -14)
-headerFix.BackgroundColor3 = COLORS.inkDeep
-headerFix.BorderSizePixel = 0
-headerFix.Parent = header
+local brandSub = Instance.new("TextLabel")
+brandSub.BackgroundTransparency = 1
+brandSub.Position = UDim2.fromOffset(14, 36)
+brandSub.Size = UDim2.new(1, -20, 0, 16)
+brandSub.Font = Enum.Font.Gotham
+brandSub.TextSize = 11
+brandSub.TextXAlignment = Enum.TextXAlignment.Left
+brandSub.TextColor3 = COLORS.muted
+brandSub.Text = "Blox Fruits"
+brandSub.Parent = brandBlock
 
-local headerBrand = Instance.new("TextLabel")
-headerBrand.BackgroundTransparency = 1
-headerBrand.Position = UDim2.fromOffset(14, 0)
-headerBrand.Size = UDim2.new(1, -90, 1, 0)
-headerBrand.Font = Enum.Font.GothamBlack
-headerBrand.TextSize = 15
-headerBrand.TextXAlignment = Enum.TextXAlignment.Left
-headerBrand.TextColor3 = COLORS.lime
-headerBrand.Text = "DXLTA"
-headerBrand.Parent = header
+navScroll = Instance.new("ScrollingFrame")
+navScroll.Name = "Nav"
+navScroll.Size = UDim2.new(1, 0, 1, -72)
+navScroll.Position = UDim2.fromOffset(0, 64)
+navScroll.BackgroundTransparency = 1
+navScroll.BorderSizePixel = 0
+navScroll.ScrollBarThickness = 2
+navScroll.ScrollBarImageColor3 = COLORS.limeDim
+navScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+navScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+navScroll.Parent = sidebarFrame
+
+local navLay = Instance.new("UIListLayout")
+navLay.Padding = UDim.new(0, 4)
+navLay.SortOrder = Enum.SortOrder.LayoutOrder
+navLay.Parent = navScroll
+
+local navPad = Instance.new("UIPadding")
+navPad.PaddingLeft = UDim.new(0, 10)
+navPad.PaddingRight = UDim.new(0, 10)
+navPad.PaddingTop = UDim.new(0, 4)
+navPad.PaddingBottom = UDim.new(0, 10)
+navPad.Parent = navScroll
+
+-- MAIN CONTENT
+contentFrame = Instance.new("Frame")
+contentFrame.Name = "Content"
+contentFrame.Size = UDim2.new(1, -SIDEBAR_W, 1, 0)
+contentFrame.Position = UDim2.fromOffset(SIDEBAR_W, 0)
+contentFrame.BackgroundColor3 = COLORS.panel
+contentFrame.BorderSizePixel = 0
+contentFrame.ClipsDescendants = true
+contentFrame.Parent = panelRoot
+
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 48)
+topBar.BackgroundTransparency = 1
+topBar.Parent = contentFrame
+
+pageTitleLbl = Instance.new("TextLabel")
+pageTitleLbl.BackgroundTransparency = 1
+pageTitleLbl.Position = UDim2.fromOffset(18, 0)
+pageTitleLbl.Size = UDim2.new(1, -100, 1, 0)
+pageTitleLbl.Font = Enum.Font.GothamBold
+pageTitleLbl.TextSize = 16
+pageTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+pageTitleLbl.TextColor3 = COLORS.text
+pageTitleLbl.Text = "Home"
+pageTitleLbl.Parent = topBar
 
 local headerBtns = Instance.new("Frame")
-headerBtns.Name = "HeaderBtns"
-headerBtns.AnchorPoint = Vector2.new(1, 0.5)
-headerBtns.Position = UDim2.new(1, -10, 0.5, 0)
-headerBtns.Size = UDim2.fromOffset(60, 26)
+headerBtns.Size = UDim2.fromOffset(70, 28)
+headerBtns.Position = UDim2.new(1, -84, 0.5, -14)
 headerBtns.BackgroundTransparency = 1
-headerBtns.Parent = header
+headerBtns.Parent = topBar
 
 local headerBtnLay = Instance.new("UIListLayout")
 headerBtnLay.FillDirection = Enum.FillDirection.Horizontal
 headerBtnLay.HorizontalAlignment = Enum.HorizontalAlignment.Right
 headerBtnLay.VerticalAlignment = Enum.VerticalAlignment.Center
 headerBtnLay.Padding = UDim.new(0, 6)
-headerBtnLay.SortOrder = Enum.SortOrder.LayoutOrder
 headerBtnLay.Parent = headerBtns
 
 local function makeHeaderBtn(text, color, order)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.fromOffset(26, 26)
+    btn.Size = UDim2.fromOffset(28, 28)
     btn.BackgroundColor3 = COLORS.ink
     btn.TextColor3 = color
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
+    btn.TextSize = 15
     btn.Text = text
     btn.AutoButtonColor = true
     btn.LayoutOrder = order
@@ -2416,62 +2304,52 @@ local function makeHeaderBtn(text, color, order)
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(1, 0)
     c.Parent = btn
-    local s = Instance.new("UIStroke")
-    s.Color = Color3.fromRGB(40, 48, 50)
-    s.Thickness = 1
-    s.Transparency = 0.4
-    s.Parent = btn
     return btn
 end
 
 local minBtn = makeHeaderBtn("−", COLORS.muted, 1)
 local closeBtn = makeHeaderBtn("×", COLORS.danger, 2)
 
--- Bottom tab bar 46px · 5 equal tabs
-local TAB_H = 46
-local tabBar = Instance.new("Frame")
-tabBar.Name = "Tabs"
-tabBar.Size = UDim2.new(1, 0, 0, TAB_H)
-tabBar.Position = UDim2.new(0, 0, 1, -TAB_H)
-tabBar.BackgroundColor3 = COLORS.inkDeep
-tabBar.BorderSizePixel = 0
-tabBar.Parent = panel
-
-local tabBarTop = Instance.new("Frame")
-tabBarTop.Size = UDim2.new(1, 0, 0, 12)
-tabBarTop.BackgroundColor3 = COLORS.inkDeep
-tabBarTop.BorderSizePixel = 0
-tabBarTop.Parent = tabBar
-
-local tabLayout = Instance.new("UIListLayout")
-tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-tabLayout.Padding = UDim.new(0, 4)
-tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-tabLayout.Parent = tabBar
-
-local tabPad = Instance.new("UIPadding")
-tabPad.PaddingLeft = UDim.new(0, 8)
-tabPad.PaddingRight = UDim.new(0, 8)
-tabPad.PaddingBottom = UDim.new(0, 6)
-tabPad.Parent = tabBar
-
-local contentHost = Instance.new("Frame")
-contentHost.Name = "Content"
-contentHost.Size = UDim2.new(1, 0, 1, -(HEADER_H + TAB_H))
-contentHost.Position = UDim2.fromOffset(0, HEADER_H)
-contentHost.BackgroundTransparency = 1
-contentHost.ClipsDescendants = true
-contentHost.Parent = panel
+local pagesHost = Instance.new("Frame")
+pagesHost.Name = "Pages"
+pagesHost.Size = UDim2.new(1, 0, 1, -48)
+pagesHost.Position = UDim2.fromOffset(0, 48)
+pagesHost.BackgroundTransparency = 1
+pagesHost.ClipsDescendants = true
+pagesHost.Parent = contentFrame
 
 local TABS = {
-    { id = "Start", label = "Start" },
-    { id = "Farm", label = "Farm" },
-    { id = "Kampf", label = "Kampf" },
-    { id = "ESP", label = "ESP" },
-    { id = "Client", label = "Client" },
+    { id = "Home", label = "Home", icon = "⌂" },
+    { id = "Farm", label = "Farm", icon = "⚔" },
+    { id = "Combat", label = "Combat", icon = "◎" },
+    { id = "ESP", label = "ESP", icon = "◉" },
+    { id = "Client", label = "Client", icon = "⎘" },
+    { id = "Teleport", label = "Teleport", icon = "⇢" },
 }
+
+local function paintNav()
+    for name, btn in pairs(tabButtons) do
+        local active = name == currentTab
+        if mobileMode then
+            btn.Size = UDim2.fromOffset(0, 36)
+            btn.AutomaticSize = Enum.AutomaticSize.X
+            btn.Text = btn:GetAttribute("Short") or btn:GetAttribute("Label") or name
+        else
+            btn.Size = UDim2.new(1, 0, 0, 34)
+            btn.AutomaticSize = Enum.AutomaticSize.None
+            btn.Text = "  " .. (btn:GetAttribute("Label") or name)
+        end
+        if active then
+            btn.BackgroundColor3 = COLORS.lime
+            btn.BackgroundTransparency = 0
+            btn.TextColor3 = COLORS.black
+        else
+            btn.BackgroundColor3 = COLORS.ink
+            btn.BackgroundTransparency = mobileMode and 0.35 or 1
+            btn.TextColor3 = COLORS.muted
+        end
+    end
+end
 
 local function switchTab(id)
     currentTab = id
@@ -2481,37 +2359,37 @@ local function switchTab(id)
             page.CanvasPosition = Vector2.zero
         end
     end
-    for name, btn in pairs(tabButtons) do
-        if name == id then
-            btn.BackgroundColor3 = COLORS.lime
-            btn.TextColor3 = COLORS.black
-            btn.BackgroundTransparency = 0
-        else
-            btn.BackgroundColor3 = COLORS.ink
-            btn.TextColor3 = COLORS.muted
-            btn.BackgroundTransparency = 1
-        end
+    if pageTitleLbl then
+        pageTitleLbl.Text = id
     end
+    paintNav()
 end
 
-local tabCount = #TABS
 for i, meta in ipairs(TABS) do
     local btn = Instance.new("TextButton")
-    btn.Name = "Tab_" .. meta.id
-    btn.Size = UDim2.new(1 / tabCount, -5, 0, 32)
+    btn.Name = "Nav_" .. meta.id
+    btn.Size = UDim2.new(1, 0, 0, 34)
     btn.BackgroundColor3 = COLORS.ink
     btn.BackgroundTransparency = 1
     btn.TextColor3 = COLORS.muted
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
-    btn.Text = meta.label
-    btn.AutoButtonColor = true
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 13
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Text = "  " .. meta.label
+    btn.AutoButtonColor = false
     btn.LayoutOrder = i
-    btn.Parent = tabBar
+    btn:SetAttribute("Label", meta.label)
+    btn:SetAttribute("Short", meta.label)
+    btn:SetAttribute("Icon", meta.icon)
+    btn.Parent = navScroll
     do
         local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 10)
+        c.CornerRadius = UDim.new(1, 0)
         c.Parent = btn
+        local pad = Instance.new("UIPadding")
+        pad.PaddingLeft = UDim.new(0, 6)
+        pad.PaddingRight = UDim.new(0, 10)
+        pad.Parent = btn
     end
     tabButtons[meta.id] = btn
     btn.MouseButton1Click:Connect(function()
@@ -2528,18 +2406,18 @@ for i, meta in ipairs(TABS) do
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     page.Visible = false
-    page.Parent = contentHost
+    page.Parent = pagesHost
 
     local lay = Instance.new("UIListLayout")
-    lay.Padding = UDim.new(0, 8)
+    lay.Padding = UDim.new(0, 10)
     lay.SortOrder = Enum.SortOrder.LayoutOrder
     lay.Parent = page
 
     local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0, 10)
-    pad.PaddingBottom = UDim.new(0, 12)
-    pad.PaddingLeft = UDim.new(0, 10)
-    pad.PaddingRight = UDim.new(0, 10)
+    pad.PaddingTop = UDim.new(0, 4)
+    pad.PaddingBottom = UDim.new(0, 16)
+    pad.PaddingLeft = UDim.new(0, 16)
+    pad.PaddingRight = UDim.new(0, 16)
     pad.Parent = page
 
     tabPages[meta.id] = page
@@ -2553,6 +2431,24 @@ end
 
 local function parentOf(tab)
     return tabPages[tab]
+end
+
+local function makeCard(tab, height)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, 0, 0, height or 72)
+    card.BackgroundColor3 = COLORS.card
+    card.BorderSizePixel = 0
+    card.LayoutOrder = nextOrder(tab)
+    card.Parent = parentOf(tab)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 12)
+    c.Parent = card
+    local s = Instance.new("UIStroke")
+    s.Color = COLORS.stroke
+    s.Thickness = 1
+    s.Transparency = 0.55
+    s.Parent = card
+    return card
 end
 
 local function sectionLabel(tab, text)
@@ -2569,39 +2465,29 @@ local function sectionLabel(tab, text)
     return lbl
 end
 
--- Toggle row: 50px · ink · corner 12 · title 14 · subtitle 11 · pill 48×28
 local function makeToggle(tab, title, key, onChange, opts)
     opts = opts or {}
-    local h = opts.giant and 56 or 50
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, h)
-    row.BackgroundColor3 = opts.giant and Color3.fromRGB(28, 36, 22) or COLORS.ink
-    row.BorderSizePixel = 0
-    row.LayoutOrder = nextOrder(tab)
-    row.Parent = parentOf(tab)
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = row
-
+    local h = opts.giant and 64 or 52
+    local row = makeCard(tab, h)
     if opts.giant then
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = COLORS.lime
-        stroke.Thickness = 1
-        stroke.Transparency = 0.55
-        stroke.Parent = row
+        row.BackgroundColor3 = COLORS.limeOn
+        local stroke = row:FindFirstChildOfClass("UIStroke")
+        if stroke then
+            stroke.Color = COLORS.lime
+            stroke.Transparency = 0.4
+        end
     end
 
     local titleLbl = Instance.new("TextLabel")
     titleLbl.BackgroundTransparency = 1
-    titleLbl.Position = UDim2.fromOffset(14, opts.sub and 8 or 0)
+    titleLbl.Position = UDim2.fromOffset(14, opts.sub and 10 or 0)
     titleLbl.Size = UDim2.new(1, -78, opts.sub and 0 or 1, opts.sub and 18 or 0)
     if not opts.sub then
         titleLbl.Size = UDim2.new(1, -78, 1, 0)
         titleLbl.Position = UDim2.fromOffset(14, 0)
     end
     titleLbl.Font = opts.giant and Enum.Font.GothamBlack or Enum.Font.GothamMedium
-    titleLbl.TextSize = opts.giant and 15 or 14
+    titleLbl.TextSize = opts.giant and 15 or 13
     titleLbl.TextXAlignment = Enum.TextXAlignment.Left
     titleLbl.TextColor3 = COLORS.text
     titleLbl.Text = title
@@ -2610,7 +2496,7 @@ local function makeToggle(tab, title, key, onChange, opts)
     if opts.sub then
         local sub = Instance.new("TextLabel")
         sub.BackgroundTransparency = 1
-        sub.Position = UDim2.fromOffset(14, 28)
+        sub.Position = UDim2.fromOffset(14, 30)
         sub.Size = UDim2.new(1, -78, 0, 14)
         sub.Font = Enum.Font.Gotham
         sub.TextSize = 11
@@ -2620,11 +2506,10 @@ local function makeToggle(tab, title, key, onChange, opts)
         sub.Parent = row
     end
 
-    -- pill switch 48×28
     local pill = Instance.new("TextButton")
     pill.Name = "Pill"
-    pill.Size = UDim2.fromOffset(48, 28)
-    pill.Position = UDim2.new(1, -60, 0.5, -14)
+    pill.Size = UDim2.fromOffset(46, 26)
+    pill.Position = UDim2.new(1, -58, 0.5, -13)
     pill.Text = ""
     pill.AutoButtonColor = false
     pill.Parent = row
@@ -2636,7 +2521,7 @@ local function makeToggle(tab, title, key, onChange, opts)
 
     local knob = Instance.new("Frame")
     knob.Name = "Knob"
-    knob.Size = UDim2.fromOffset(22, 22)
+    knob.Size = UDim2.fromOffset(20, 20)
     knob.Position = UDim2.fromOffset(3, 3)
     knob.BackgroundColor3 = COLORS.text
     knob.BorderSizePixel = 0
@@ -2652,16 +2537,10 @@ local function makeToggle(tab, title, key, onChange, opts)
             pill.BackgroundColor3 = COLORS.lime
             knob.BackgroundColor3 = COLORS.black
             knob.Position = UDim2.fromOffset(23, 3)
-            if opts.giant then
-                row.BackgroundColor3 = Color3.fromRGB(36, 48, 22)
-            end
         else
-            pill.BackgroundColor3 = Color3.fromRGB(48, 54, 56)
+            pill.BackgroundColor3 = Color3.fromRGB(58, 62, 70)
             knob.BackgroundColor3 = COLORS.muted
             knob.Position = UDim2.fromOffset(3, 3)
-            if opts.giant then
-                row.BackgroundColor3 = Color3.fromRGB(28, 36, 22)
-            end
         end
     end
     paint()
@@ -2694,17 +2573,7 @@ local function makeToggle(tab, title, key, onChange, opts)
 end
 
 local function makeSlider(tab, label, key, minV, maxV)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 52)
-    row.BackgroundColor3 = COLORS.ink
-    row.BorderSizePixel = 0
-    row.LayoutOrder = nextOrder(tab)
-    row.Parent = parentOf(tab)
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = row
-
+    local row = makeCard(tab, 58)
     local lab = Instance.new("TextLabel")
     lab.BackgroundTransparency = 1
     lab.Position = UDim2.fromOffset(14, 8)
@@ -2717,9 +2586,9 @@ local function makeSlider(tab, label, key, minV, maxV)
     lab.Parent = row
 
     local bar = Instance.new("Frame")
-    bar.Position = UDim2.fromOffset(14, 30)
-    bar.Size = UDim2.new(1, -28, 0, 10)
-    bar.BackgroundColor3 = Color3.fromRGB(40, 46, 48)
+    bar.Position = UDim2.fromOffset(14, 34)
+    bar.Size = UDim2.new(1, -28, 0, 8)
+    bar.BackgroundColor3 = Color3.fromRGB(50, 54, 60)
     bar.BorderSizePixel = 0
     bar.Parent = row
     do
@@ -2768,7 +2637,7 @@ end
 
 local function makeButton(tab, label, color, onClick)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 42)
+    btn.Size = UDim2.new(1, 0, 0, 40)
     btn.BackgroundColor3 = color or COLORS.lime
     btn.TextColor3 = COLORS.black
     btn.Font = Enum.Font.GothamBold
@@ -2779,7 +2648,7 @@ local function makeButton(tab, label, color, onClick)
     btn.Parent = parentOf(tab)
     do
         local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 12)
+        c.CornerRadius = UDim.new(0, 10)
         c.Parent = btn
     end
     btn.MouseButton1Click:Connect(function()
@@ -2804,62 +2673,176 @@ local function makeTip(tab, text, h)
     return lbl
 end
 
+local function makeStatCard(tab, title, key, height)
+    local card = makeCard(tab, height or 70)
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Position = UDim2.fromOffset(14, 10)
+    t.Size = UDim2.new(1, -28, 0, 14)
+    t.Font = Enum.Font.Gotham
+    t.TextSize = 11
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.TextColor3 = COLORS.muted
+    t.Text = title
+    t.Parent = card
+
+    local v = Instance.new("TextLabel")
+    v.BackgroundTransparency = 1
+    v.Position = UDim2.fromOffset(14, 28)
+    v.Size = UDim2.new(1, -28, 0, 28)
+    v.Font = Enum.Font.GothamBold
+    v.TextSize = 18
+    v.TextXAlignment = Enum.TextXAlignment.Left
+    v.TextColor3 = COLORS.text
+    v.Text = "—"
+    v.Parent = card
+    liveLabels[key] = v
+    return card, v
+end
+
 local farmToggleUI, questToggleUI, auraToggleUI, busoToggleUI, fastToggleUI, pullToggleUI
 
--- ═══ START ══════════════════════════════════════════════════════════════════
+-- ═══ HOME ═══════════════════════════════════════════════════════════════════
 
-local hero = Instance.new("TextLabel")
-hero.BackgroundTransparency = 1
-hero.Size = UDim2.new(1, 0, 0, 32)
-hero.Font = Enum.Font.GothamBlack
-hero.TextSize = 28
-hero.TextXAlignment = Enum.TextXAlignment.Left
-hero.TextColor3 = COLORS.lime
-hero.Text = "DXLTA"
-hero.LayoutOrder = nextOrder("Start")
-hero.Parent = parentOf("Start")
+local welcome = makeCard("Home", 78)
+do
+    local hi = Instance.new("TextLabel")
+    hi.BackgroundTransparency = 1
+    hi.Position = UDim2.fromOffset(16, 14)
+    hi.Size = UDim2.new(1, -32, 0, 18)
+    hi.Font = Enum.Font.Gotham
+    hi.TextSize = 12
+    hi.TextXAlignment = Enum.TextXAlignment.Left
+    hi.TextColor3 = COLORS.muted
+    hi.Text = "Welcome"
+    hi.Parent = welcome
 
-local heroSub = Instance.new("TextLabel")
-heroSub.BackgroundTransparency = 1
-heroSub.Size = UDim2.new(1, 0, 0, 16)
-heroSub.Font = Enum.Font.Gotham
-heroSub.TextSize = 12
-heroSub.TextXAlignment = Enum.TextXAlignment.Left
-heroSub.TextColor3 = COLORS.muted
-heroSub.Text = "Mobile farm hub · fly · silent hit"
-heroSub.LayoutOrder = nextOrder("Start")
-heroSub.Parent = parentOf("Start")
+    local nameLbl = Instance.new("TextLabel")
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Position = UDim2.fromOffset(16, 34)
+    nameLbl.Size = UDim2.new(1, -32, 0, 28)
+    nameLbl.Font = Enum.Font.GothamBlack
+    nameLbl.TextSize = 20
+    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    nameLbl.TextColor3 = COLORS.text
+    nameLbl.Text = tostring(LocalPlayer.DisplayName or LocalPlayer.Name)
+    nameLbl.Parent = welcome
+    liveLabels.welcome = nameLbl
+end
 
-fastToggleUI = makeToggle("Start", "FAST FARM", "fastFarm", function(on)
+local metricsRow = Instance.new("Frame")
+metricsRow.Size = UDim2.new(1, 0, 0, 70)
+metricsRow.BackgroundTransparency = 1
+metricsRow.LayoutOrder = nextOrder("Home")
+metricsRow.Parent = parentOf("Home")
+
+local metricsLay = Instance.new("UIListLayout")
+metricsLay.FillDirection = Enum.FillDirection.Horizontal
+metricsLay.Padding = UDim.new(0, 10)
+metricsLay.Parent = metricsRow
+
+local function miniMetric(parent, title, key, order)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(0.5, -5, 1, 0)
+    card.BackgroundColor3 = COLORS.card
+    card.BorderSizePixel = 0
+    card.LayoutOrder = order
+    card.Parent = parent
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 12)
+    c.Parent = card
+    local s = Instance.new("UIStroke")
+    s.Color = COLORS.stroke
+    s.Thickness = 1
+    s.Transparency = 0.55
+    s.Parent = card
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Position = UDim2.fromOffset(12, 10)
+    t.Size = UDim2.new(1, -20, 0, 14)
+    t.Font = Enum.Font.Gotham
+    t.TextSize = 11
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.TextColor3 = COLORS.muted
+    t.Text = title
+    t.Parent = card
+    local v = Instance.new("TextLabel")
+    v.BackgroundTransparency = 1
+    v.Position = UDim2.fromOffset(12, 30)
+    v.Size = UDim2.new(1, -20, 0, 26)
+    v.Font = Enum.Font.GothamBold
+    v.TextSize = 16
+    v.TextXAlignment = Enum.TextXAlignment.Left
+    v.TextColor3 = COLORS.text
+    v.Text = "—"
+    v.Parent = card
+    liveLabels[key] = v
+    return v
+end
+
+miniMetric(metricsRow, "FPS / Ping", "fpsPing", 1)
+miniMetric(metricsRow, "Session", "session", 2)
+
+fastToggleUI = makeToggle("Home", "FAST FARM", "fastFarm", function(on)
     applyFastFarm(on)
     refreshToggleUIs()
 end, { giant = true, sub = "farm · quest · aura · buso" })
 
--- compact status block — 4 mono lines, no empty void
-local statusCard = Instance.new("Frame")
-statusCard.Size = UDim2.new(1, 0, 0, 78)
-statusCard.BackgroundColor3 = COLORS.ink
-statusCard.BorderSizePixel = 0
-statusCard.LayoutOrder = nextOrder("Start")
-statusCard.Parent = parentOf("Start")
+local homeState = makeCard("Home", 72)
 do
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 12)
-    c.Parent = statusCard
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Position = UDim2.fromOffset(14, 10)
+    t.Size = UDim2.new(1, -28, 0, 14)
+    t.Font = Enum.Font.Gotham
+    t.TextSize = 11
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.TextColor3 = COLORS.muted
+    t.Text = "Live farm state"
+    t.Parent = homeState
+    local v = Instance.new("TextLabel")
+    v.BackgroundTransparency = 1
+    v.Position = UDim2.fromOffset(14, 28)
+    v.Size = UDim2.new(1, -28, 0, 32)
+    v.Font = Enum.Font.Code
+    v.TextSize = 12
+    v.TextXAlignment = Enum.TextXAlignment.Left
+    v.TextYAlignment = Enum.TextYAlignment.Top
+    v.TextColor3 = COLORS.limeSoft
+    v.TextWrapped = true
+    v.Text = "idle"
+    v.Parent = homeState
+    liveLabels.homeState = v
 end
 
-statusBlockLbl = Instance.new("TextLabel")
-statusBlockLbl.BackgroundTransparency = 1
-statusBlockLbl.Position = UDim2.fromOffset(12, 10)
-statusBlockLbl.Size = UDim2.new(1, -24, 1, -16)
-statusBlockLbl.Font = Enum.Font.Code
-statusBlockLbl.TextSize = 11
-statusBlockLbl.TextXAlignment = Enum.TextXAlignment.Left
-statusBlockLbl.TextYAlignment = Enum.TextYAlignment.Top
-statusBlockLbl.TextColor3 = COLORS.limeSoft
-statusBlockLbl.TextWrapped = true
-statusBlockLbl.Text = statusBlockText()
-statusBlockLbl.Parent = statusCard
+local footer = makeCard("Home", 78)
+do
+    local ids = Instance.new("TextLabel")
+    ids.BackgroundTransparency = 1
+    ids.Position = UDim2.fromOffset(14, 10)
+    ids.Size = UDim2.new(1, -28, 0, 28)
+    ids.Font = Enum.Font.Code
+    ids.TextSize = 11
+    ids.TextXAlignment = Enum.TextXAlignment.Left
+    ids.TextYAlignment = Enum.TextYAlignment.Top
+    ids.TextColor3 = COLORS.muted
+    ids.TextWrapped = true
+    ids.Text = string.format("JobId %s\nPlaceId %s · %s", tostring(game.JobId), tostring(game.PlaceId), seaLabel())
+    ids.Parent = footer
+    liveLabels.ids = ids
+
+    local tip = Instance.new("TextLabel")
+    tip.BackgroundTransparency = 1
+    tip.Position = UDim2.fromOffset(14, 44)
+    tip.Size = UDim2.new(1, -28, 0, 24)
+    tip.Font = Enum.Font.Gotham
+    tip.TextSize = 11
+    tip.TextXAlignment = Enum.TextXAlignment.Left
+    tip.TextColor3 = COLORS.limeSoft
+    tip.TextWrapped = true
+    tip.Text = "Workflow: FAST FARM 30s → Client COPY All → paste in chat"
+    tip.Parent = footer
+end
 
 -- ═══ FARM ═══════════════════════════════════════════════════════════════════
 
@@ -2879,11 +2862,11 @@ farmToggleUI = makeToggle("Farm", "Auto Farm", "farm", function(on)
         ringPush("farm ON")
         hookAnimSuppress(localChar())
     end
-end, { sub = "nearest Enemies · fly 220 · hit hum" })
+end, { sub = "nearest Enemies · speed 240 · hit hum" })
 
 questToggleUI = makeToggle("Farm", "Auto Quest", "autoQuest", function(on)
     ringPush(on and "auto quest ON" or "auto quest OFF")
-end, { sub = "StartQuest / giver prompt" })
+end, { sub = "CommF_ StartQuest · soft fail OK" })
 
 busoToggleUI = makeToggle("Farm", "Auto Buso", "autoBuso", function(on)
     ringPush(on and "auto buso ON" or "auto buso OFF")
@@ -2896,15 +2879,43 @@ pullToggleUI = makeToggle("Farm", "Mob Pull", "mobPull", function(on)
     ringPush(on and "mob pull ON" or "mob pull OFF")
 end, { sub = "net-owner pull nearby" })
 
-makeSlider("Farm", "Fly speed", "bfSpeed", 180, 280)
-makeTip("Farm", "flug → pin ≤10m · EquipTool Godhuman · RegisterAttack(0.5)+Hit(hum) · stream far", 36)
+makeSlider("Farm", "Tween speed", "bfSpeed", 120, 320)
 
--- ═══ KAMPF ══════════════════════════════════════════════════════════════════
+local farmLive = makeCard("Farm", 86)
+do
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Position = UDim2.fromOffset(14, 10)
+    t.Size = UDim2.new(1, -28, 0, 14)
+    t.Font = Enum.Font.Gotham
+    t.TextSize = 11
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.TextColor3 = COLORS.muted
+    t.Text = "Live farm"
+    t.Parent = farmLive
+    local v = Instance.new("TextLabel")
+    v.BackgroundTransparency = 1
+    v.Position = UDim2.fromOffset(14, 28)
+    v.Size = UDim2.new(1, -28, 0, 46)
+    v.Font = Enum.Font.Code
+    v.TextSize = 12
+    v.TextXAlignment = Enum.TextXAlignment.Left
+    v.TextYAlignment = Enum.TextYAlignment.Top
+    v.TextColor3 = COLORS.limeSoft
+    v.TextWrapped = true
+    v.Text = "idle"
+    v.Parent = farmLive
+    liveLabels.farmLive = v
+end
 
-sectionLabel("Kampf", "Silent Aura")
-auraToggleUI = makeToggle("Kampf", "Kill Aura", "killAura", function(on)
+makeTip("Farm", "Travel → pin @ 8 studs · Godhuman each cycle · RegisterAttack(0.5)+Hit(hum) · stream while far · chunk hop if stuck 2s", 40)
+
+-- ═══ COMBAT ═════════════════════════════════════════════════════════════════
+
+sectionLabel("Combat", "Silent Aura")
+auraToggleUI = makeToggle("Combat", "Silent Aura", "killAura", function(on)
     lastAuraNear = nil
-    ringPush(on and "kill aura ON" or "kill aura OFF")
+    ringPush(on and "silent aura ON" or "silent aura OFF")
     if on then
         hookAnimSuppress(localChar())
     end
@@ -2912,16 +2923,16 @@ auraToggleUI = makeToggle("Kampf", "Kill Aura", "killAura", function(on)
         STATE.fastFarm = false
         if fastToggleUI then fastToggleUI.paint() end
     end
-end, { sub = "Melee → Attack(0.5) → Hit(hum)" })
+end, { sub = "LOCKED RegisterAttack(0.5) → RegisterHit(hum)" })
 
-makeSlider("Kampf", "Aura range", "kaRange", 5, 60)
-makeSlider("Kampf", "Attack rate", "kaRate", 1, 14)
-makeTip("Kampf", "Locked remotes only · Activate fallback · anims stopped", 28)
+makeSlider("Combat", "Aura range", "kaRange", 5, 60)
+makeSlider("Combat", "Attack rate", "kaRate", 1, 14)
+makeTip("Combat", "Locked remotes only · Godhuman equip · attack anims suppressed", 28)
 
 -- ═══ ESP ════════════════════════════════════════════════════════════════════
 
 sectionLabel("ESP", "Overlays")
-makeToggle("ESP", "Gegner ESP", "enemyEsp", function(on)
+makeToggle("ESP", "Enemy ESP", "enemyEsp", function(on)
     if not on then
         for model in pairs(enemyEspMap) do
             clearEspOn(model)
@@ -2930,7 +2941,7 @@ makeToggle("ESP", "Gegner ESP", "enemyEsp", function(on)
     else
         refreshEnemyEsp()
     end
-end, { sub = "workspace.Enemies tags" })
+end, { sub = "workspace.Enemies" })
 
 makeToggle("ESP", "NPC ESP", "npcEsp", function(on)
     if not on then
@@ -2941,9 +2952,9 @@ makeToggle("ESP", "NPC ESP", "npcEsp", function(on)
     else
         refreshNpcEsp()
     end
-end, { sub = "workspace.NPCs" })
+end, { sub = "workspace.NPCs (optional)" })
 
-makeToggle("ESP", "Spieler ESP", "playerEsp", function(on)
+makeToggle("ESP", "Player ESP", "playerEsp", function(on)
     if not on then
         for model in pairs(playerEspMap) do
             clearEspOn(model)
@@ -2952,7 +2963,7 @@ makeToggle("ESP", "Spieler ESP", "playerEsp", function(on)
     else
         refreshPlayerEsp()
     end
-end, { sub = "other players" })
+end, { sub = "other players (optional)" })
 
 -- ═══ CLIENT ═════════════════════════════════════════════════════════════════
 
@@ -2962,7 +2973,7 @@ makeToggle("Client", "Auto-Copy All (3s)", "autoCopyAll", function(on)
     if on then
         doAutoCopyAll()
     end
-end, { sub = "combat remotes + last 40 logs" })
+end, { sub = "ON by default · remotes + last 40 logs" })
 
 clientStatusLbl = Instance.new("TextLabel")
 clientStatusLbl.BackgroundTransparency = 1
@@ -2971,7 +2982,7 @@ clientStatusLbl.Font = Enum.Font.Gotham
 clientStatusLbl.TextSize = 11
 clientStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
 clientStatusLbl.TextColor3 = COLORS.muted
-clientStatusLbl.Text = "Client bereit · Auto-Copy AN"
+clientStatusLbl.Text = "Client ready · Auto-Copy ON"
 clientStatusLbl.LayoutOrder = nextOrder("Client")
 clientStatusLbl.Parent = parentOf("Client")
 
@@ -2986,138 +2997,152 @@ setClientStatus = function(msg, ok)
     end
 end
 
-makeButton("Client", "COPY Client", COLORS.lime, function()
-    if copyClip(buildClientDump()) then
-        ST.lastCopy = os.date("%H:%M:%S")
-        setClientStatus("Client kopiert @ " .. ST.lastCopy, true)
-        notify("DXLTA", "Client dump kopiert", 2)
-    else
-        setClientStatus("Clipboard unavailable", false)
-    end
-end)
-
-makeButton("Client", "COPY Errors", Color3.fromRGB(200, 90, 70), function()
-    if copyClip(errorText()) then
-        setClientStatus("Errors kopiert (" .. tostring(#errorRing) .. ")", true)
-        notify("DXLTA", "Errors kopiert", 2)
-    else
-        setClientStatus("Clipboard unavailable", false)
-    end
-end)
-
-makeButton("Client", "COPY Logs", Color3.fromRGB(120, 180, 70), function()
-    if copyClip(ringText()) then
-        setClientStatus("Logs kopiert (" .. tostring(#ringLog) .. ")", true)
-        notify("DXLTA", "Logs kopiert", 2)
-    else
-        setClientStatus("Clipboard unavailable", false)
-    end
-end)
-
-makeButton("Client", "COPY All", COLORS.limeSoft, function()
+makeButton("Client", "COPY All", COLORS.lime, function()
     if copyClip(buildAllBundle()) then
         ST.lastCopy = os.date("%H:%M:%S")
-        setClientStatus("All kopiert @ " .. ST.lastCopy, true)
-        notify("DXLTA", "All bundle kopiert — pasten", 3)
+        setClientStatus("All copied @ " .. ST.lastCopy, true)
+        notify("DXLTA", "All bundle copied — paste in chat", 3)
     else
         setClientStatus("Clipboard unavailable", false)
     end
 end)
 
-sectionLabel("Client", "Scan")
-scoutFilterBox = Instance.new("TextBox")
-scoutFilterBox.Name = "ScanFilter"
-scoutFilterBox.PlaceholderText = "Filter: Remote, CommF, Net…"
-scoutFilterBox.Text = ""
-scoutFilterBox.ClearTextOnFocus = false
-scoutFilterBox.Size = UDim2.new(1, 0, 0, 36)
-scoutFilterBox.BackgroundColor3 = COLORS.ink
-scoutFilterBox.TextColor3 = COLORS.text
-scoutFilterBox.PlaceholderColor3 = COLORS.muted
-scoutFilterBox.Font = Enum.Font.Code
-scoutFilterBox.TextSize = 12
-scoutFilterBox.TextXAlignment = Enum.TextXAlignment.Left
-scoutFilterBox.LayoutOrder = nextOrder("Client")
-scoutFilterBox.Parent = parentOf("Client")
-do
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 12)
-    c.Parent = scoutFilterBox
-    local s = Instance.new("UIStroke")
-    s.Color = Color3.fromRGB(40, 48, 50)
-    s.Thickness = 1
-    s.Transparency = 0.35
-    s.Parent = scoutFilterBox
-    local pad = Instance.new("UIPadding")
-    pad.PaddingLeft = UDim.new(0, 10)
-    pad.Parent = scoutFilterBox
-end
-
-local scoutPreviewWrap = Instance.new("Frame")
-scoutPreviewWrap.Size = UDim2.new(1, 0, 0, 100)
-scoutPreviewWrap.BackgroundColor3 = COLORS.ink
-scoutPreviewWrap.BorderSizePixel = 0
-scoutPreviewWrap.LayoutOrder = nextOrder("Client")
-scoutPreviewWrap.Parent = parentOf("Client")
-do
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 12)
-    c.Parent = scoutPreviewWrap
-end
-
-local scoutScroll = Instance.new("ScrollingFrame")
-scoutScroll.Size = UDim2.new(1, -8, 1, -6)
-scoutScroll.Position = UDim2.fromOffset(4, 3)
-scoutScroll.BackgroundTransparency = 1
-scoutScroll.BorderSizePixel = 0
-scoutScroll.ScrollBarThickness = 3
-scoutScroll.ScrollBarImageColor3 = COLORS.limeDim
-scoutScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-scoutScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-scoutScroll.Parent = scoutPreviewWrap
-
-scoutPreviewLbl = Instance.new("TextLabel")
-scoutPreviewLbl.BackgroundTransparency = 1
-scoutPreviewLbl.Size = UDim2.new(1, -4, 0, 0)
-scoutPreviewLbl.AutomaticSize = Enum.AutomaticSize.Y
-scoutPreviewLbl.Font = Enum.Font.Code
-scoutPreviewLbl.TextSize = 10
-scoutPreviewLbl.TextXAlignment = Enum.TextXAlignment.Left
-scoutPreviewLbl.TextYAlignment = Enum.TextYAlignment.Top
-scoutPreviewLbl.TextColor3 = COLORS.muted
-scoutPreviewLbl.TextWrapped = true
-scoutPreviewLbl.Text = "(SCAN für Remotes)"
-scoutPreviewLbl.Parent = scoutScroll
-
-local function setScoutPreview(text)
-    local t = tostring(text or "")
-    if #t > 2800 then
-        scoutPreviewLbl.Text = t:sub(1, 2800) .. "\n… truncated"
+makeButton("Client", "COPY Client", COLORS.limeSoft, function()
+    if copyClip(buildClientDump()) then
+        ST.lastCopy = os.date("%H:%M:%S")
+        setClientStatus("Client copied @ " .. ST.lastCopy, true)
+        notify("DXLTA", "Client dump copied", 2)
     else
-        scoutPreviewLbl.Text = t ~= "" and t or "(leer)"
+        setClientStatus("Clipboard unavailable", false)
     end
-end
-
-makeButton("Client", "SCAN", Color3.fromRGB(90, 140, 60), function()
-    setClientStatus("Scanning…", nil)
-    task.wait()
-    local view, filteredLines, total = runScoutScan(scoutFilterBox.Text)
-    setScoutPreview(view)
-    setClientStatus(string.format("Scan · %d Zeilen · Ansicht %d", total, #filteredLines), true)
-    ringPush("scan " .. tostring(total) .. " lines")
 end)
 
-switchTab("Start")
+makeButton("Client", "COPY Errors", Color3.fromRGB(200, 100, 80), function()
+    if copyClip(errorText()) then
+        setClientStatus("Errors copied (" .. tostring(#errorRing) .. ")", true)
+    else
+        setClientStatus("Clipboard unavailable", false)
+    end
+end)
 
--- Smooth open scale 0.96 → 1
-panel.Size = UDim2.fromScale(0.9 * 0.96, 0.55 * 0.96)
+makeButton("Client", "COPY Logs", Color3.fromRGB(120, 170, 80), function()
+    if copyClip(ringText()) then
+        setClientStatus("Logs copied (" .. tostring(#ringLog) .. ")", true)
+    else
+        setClientStatus("Clipboard unavailable", false)
+    end
+end)
+
+makeTip("Client", "Farm 30s ON then paste — Workflow: FAST FARM 30s → COPY All → paste in chat", 36)
+
+local lastCopyCard = makeCard("Client", 52)
+do
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Position = UDim2.fromOffset(14, 8)
+    t.Size = UDim2.new(1, -28, 0, 14)
+    t.Font = Enum.Font.Gotham
+    t.TextSize = 11
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.TextColor3 = COLORS.muted
+    t.Text = "Last copy"
+    t.Parent = lastCopyCard
+    local v = Instance.new("TextLabel")
+    v.BackgroundTransparency = 1
+    v.Position = UDim2.fromOffset(14, 24)
+    v.Size = UDim2.new(1, -28, 0, 20)
+    v.Font = Enum.Font.GothamBold
+    v.TextSize = 14
+    v.TextXAlignment = Enum.TextXAlignment.Left
+    v.TextColor3 = COLORS.text
+    v.Text = "—"
+    v.Parent = lastCopyCard
+    liveLabels.lastCopy = v
+end
+
+-- ═══ TELEPORT (stub) ════════════════════════════════════════════════════════
+
+sectionLabel("Teleport", "Soon")
+local tpCard = makeCard("Teleport", 90)
+do
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Position = UDim2.fromOffset(16, 18)
+    t.Size = UDim2.new(1, -32, 0, 54)
+    t.Font = Enum.Font.Gotham
+    t.TextSize = 13
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.TextYAlignment = Enum.TextYAlignment.Top
+    t.TextColor3 = COLORS.muted
+    t.TextWrapped = true
+    t.Text = "Teleport destinations coming next.\nUse Farm travel for now — it streams + hops to nearest enemies."
+    t.Parent = tpCard
+end
+
+switchTab("Home")
+
+-- Responsive: AbsoluteSize.X < 700 → top chip rail
+local function applyLayout(width)
+    local wantMobile = width < MOBILE_BREAK
+    if wantMobile == mobileMode and width > 0 then
+        -- still refresh sizes
+    end
+    mobileMode = wantMobile
+    if mobileMode then
+        sidebarFrame.Size = UDim2.new(1, 0, 0, 56)
+        sidebarFrame.Position = UDim2.fromOffset(0, 0)
+        brandBlock.Visible = false
+        navScroll.Size = UDim2.new(1, 0, 1, 0)
+        navScroll.Position = UDim2.fromOffset(0, 0)
+        navLay.FillDirection = Enum.FillDirection.Horizontal
+        navLay.Padding = UDim.new(0, 6)
+        navPad.PaddingLeft = UDim.new(0, 8)
+        navPad.PaddingRight = UDim.new(0, 8)
+        navPad.PaddingTop = UDim.new(0, 10)
+        navPad.PaddingBottom = UDim.new(0, 10)
+        navScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
+        navScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        navScroll.ScrollingDirection = Enum.ScrollingDirection.X
+        contentFrame.Size = UDim2.new(1, 0, 1, -56)
+        contentFrame.Position = UDim2.fromOffset(0, 56)
+        panelRoot.Size = UDim2.new(0.94, 0, 0.72, 0)
+    else
+        sidebarFrame.Size = UDim2.new(0, SIDEBAR_W, 1, 0)
+        sidebarFrame.Position = UDim2.fromOffset(0, 0)
+        brandBlock.Visible = true
+        navScroll.Size = UDim2.new(1, 0, 1, -72)
+        navScroll.Position = UDim2.fromOffset(0, 64)
+        navLay.FillDirection = Enum.FillDirection.Vertical
+        navLay.Padding = UDim.new(0, 4)
+        navPad.PaddingLeft = UDim.new(0, 10)
+        navPad.PaddingRight = UDim.new(0, 10)
+        navPad.PaddingTop = UDim.new(0, 4)
+        navPad.PaddingBottom = UDim.new(0, 10)
+        navScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        navScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+        contentFrame.Size = UDim2.new(1, -SIDEBAR_W, 1, 0)
+        contentFrame.Position = UDim2.fromOffset(SIDEBAR_W, 0)
+        panelRoot.Size = UDim2.fromOffset(720, 460)
+    end
+    paintNav()
+end
+
+track(panelRoot:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+    applyLayout(panelRoot.AbsoluteSize.X)
+end))
+task.defer(function()
+    applyLayout(panelRoot.AbsoluteSize.X)
+end)
+
+-- open tween
+panelRoot.Size = UDim2.fromOffset(690, 440)
 pcall(function()
-    TweenService:Create(panel, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-        Size = UDim2.fromScale(0.9, 0.55),
+    TweenService:Create(panelRoot, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Size = UDim2.fromOffset(720, 460),
     }):Play()
 end)
 
--- ── LEFT reopen orb 48px @ (0,14,0.42,0) ─────────────────────────────────────
+-- ── LEFT reopen orb ─────────────────────────────────────────────────────────
 
 local orb = Instance.new("ScreenGui")
 orb.Name = ORB_NAME
@@ -3152,21 +3177,16 @@ end
 
 local function setPanelVisible(vis)
     STATE.panelVisible = vis
-    panel.Visible = vis
+    panelRoot.Visible = vis
     orb.Enabled = not vis
     if vis then
-        panel.Size = UDim2.fromScale(0.9 * 0.96, 0.55 * 0.96)
-        pcall(function()
-            TweenService:Create(panel, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Size = UDim2.fromScale(0.9, 0.55),
-            }):Play()
-        end)
+        applyLayout(panelRoot.AbsoluteSize.X > 0 and panelRoot.AbsoluteSize.X or 720)
     end
 end
 
 minBtn.MouseButton1Click:Connect(function()
     setPanelVisible(false)
-    ringPush("panel minimized · left orb")
+    ringPush("panel minimized · left D orb")
 end)
 
 closeBtn.MouseButton1Click:Connect(function()
@@ -3225,14 +3245,14 @@ end
 do
     local dragging = false
     local dragStart, startPos
-    track(header.InputBegan:Connect(function(input)
+    track(topBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
-            startPos = panel.Position
+            startPos = panelRoot.Position
         end
     end))
-    track(header.InputEnded:Connect(function(input)
+    track(topBar.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
@@ -3243,7 +3263,7 @@ do
         end
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             local delta = input.Position - dragStart
-            panel.Position = UDim2.new(
+            panelRoot.Position = UDim2.new(
                 startPos.X.Scale,
                 startPos.X.Offset + delta.X,
                 startPos.Y.Scale,
@@ -3258,15 +3278,22 @@ track(UserInputService.InputBegan:Connect(function(input, gp)
         return
     end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        if panel.Parent then
+        if panelRoot.Parent then
             setPanelVisible(not STATE.panelVisible)
         end
     end
 end))
 
-track(RunService.Heartbeat:Connect(function()
+track(RunService.Heartbeat:Connect(function(dt)
     if not alive then
         return
+    end
+    fpsFrames += 1
+    fpsAccum += dt
+    if fpsAccum >= 0.5 then
+        fpsValue = fpsFrames / fpsAccum
+        fpsFrames = 0
+        fpsAccum = 0
     end
     pcall(function()
         if pin then
@@ -3301,7 +3328,6 @@ track(RunService.Heartbeat:Connect(function()
     end)
 end))
 
--- Silent aura ~0.12s when killAura (farm has its own tick loop)
 task.spawn(function()
     while alive do
         task.wait(0.12)
@@ -3314,7 +3340,6 @@ task.spawn(function()
     end
 end)
 
--- Farm / fastFarm driver ~0.1s
 task.spawn(function()
     while alive do
         task.wait(0.1)
@@ -3331,7 +3356,6 @@ task.spawn(function()
     end
 end)
 
--- Auto-Copy trimmed bundle every 3s
 task.spawn(function()
     while alive do
         task.wait(3)
@@ -3367,11 +3391,41 @@ track(RunService.Heartbeat:Connect(function(dt)
             lastFarmLogged = ST.farm
             ringPush("farm: " .. tostring(ST.farm))
         end
-        if statusBlockLbl then
-            statusBlockLbl.Text = statusBlockText()
+        if liveLabels.fpsPing then
+            liveLabels.fpsPing.Text = string.format("%s fps · %s", ST.fps, ST.ping)
+        end
+        if liveLabels.session then
+            liveLabels.session.Text = ST.session
+        end
+        if liveLabels.homeState then
+            liveLabels.homeState.Text = string.format(
+                "%s\nnear %s · kills %s · buso %s",
+                tostring(ST.farm),
+                tostring(ST.nearest),
+                tostring(ST.kills),
+                tostring(ST.buso)
+            )
+        end
+        if liveLabels.farmLive then
+            liveLabels.farmLive.Text = string.format(
+                "state  %s\nnear   %s\nkills  %s · remotes %s",
+                tostring(ST.farm),
+                tostring(ST.nearest),
+                tostring(ST.kills),
+                tostring(ST.remotes)
+            )
         end
         if liveLabels.lastCopy then
             liveLabels.lastCopy.Text = tostring(ST.lastCopy)
+        end
+        if liveLabels.ids then
+            liveLabels.ids.Text = string.format(
+                "JobId %s\nPlaceId %s · %s · mem %s",
+                tostring(game.JobId),
+                tostring(game.PlaceId),
+                seaLabel(),
+                readMem()
+            )
         end
     end)
 end))
@@ -3394,7 +3448,7 @@ task.defer(function()
     pcall(discoverCombatRemotes)
     pcall(countNetRemotes)
     ringPush("LOCKED RegisterAttack(0.5) → RegisterHit(hum)")
-    ringPush("v2.3 travel 220 · stream · Godhuman equip")
+    ringPush("v" .. VERSION .. " sidebar · travel 240 · pin 8 · Godhuman")
     if STATE.autoCopyAll then
         doAutoCopyAll()
     end
@@ -3429,10 +3483,11 @@ screen.Destroying:Connect(function()
     pcall(HUB.unload)
 end)
 
-notify("DXLTA", "BF Panel v2.3 · left D orb · locked Hit(hum)", 4)
-print("[DXLTA] BF Panel ready — panel.lua v2.3")
+notify("DXLTA", "BF Panel v3.0 · sidebar + locked Hit(hum)", 4)
+print("[DXLTA] BF Panel ready — panel.lua v3.0")
+print("[DXLTA] UI: left sidebar + cards · Home/Farm/Combat/ESP/Client/Teleport")
 print("[DXLTA] Locked: Modules.Net RE/RegisterAttack:FireServer(0.5) → RE/RegisterHit:FireServer(hum)")
-print("[DXLTA] Minimize → left lime D orb @ UDim2.new(0,14,0.42,0)")
+print("[DXLTA] Minimize → left D orb")
 
 end, debug.traceback)
 
