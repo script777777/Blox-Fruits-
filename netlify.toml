@@ -6,7 +6,9 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# SPA fallback — Netlify Functions with custom paths (/api/*) take precedence
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  force = false

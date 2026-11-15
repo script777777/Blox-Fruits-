@@ -16,6 +16,8 @@ export type BypassResult = BypassSuccess | BypassError;
 
 export type BypassOptions = {
   apiKey?: string;
+  /** Use upstream /v1/refresh when the configured URL ends with /bypass */
+  refresh?: boolean;
 };
 
 function readEnv(name: string): string | undefined {
@@ -89,7 +91,10 @@ function extractError(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-function resolveApiConfig(overrideKey?: string): {
+function resolveApiConfig(
+  overrideKey?: string,
+  refresh = false,
+): {
   apiUrl: string;
   apiKey: string | undefined;
   authMode: string;
@@ -97,8 +102,14 @@ function resolveApiConfig(overrideKey?: string): {
   urlParam: string;
   keyParam: string;
 } {
+  let apiUrl = readEnv("BYPASS_API_URL") || "https://api.izen.lol/v1/bypass";
+  if (refresh) {
+    apiUrl =
+      readEnv("BYPASS_API_REFRESH_URL") ||
+      apiUrl.replace(/\/bypass(?:\?.*)?$/, "/refresh");
+  }
   return {
-    apiUrl: readEnv("BYPASS_API_URL") || "https://api.izen.lol/v1/bypass",
+    apiUrl,
     apiKey: overrideKey?.trim() || readEnv("BYPASS_API_KEY"),
     authMode: (readEnv("BYPASS_API_AUTH") || "header").toLowerCase(),
     httpMethod: (readEnv("BYPASS_API_METHOD") || "GET").toUpperCase(),
@@ -110,9 +121,10 @@ function resolveApiConfig(overrideKey?: string): {
 function buildUpstreamRequest(
   targetUrl: string,
   overrideKey?: string,
+  refresh = false,
 ): { url: string; init: RequestInit } {
   const { apiUrl, apiKey, authMode, httpMethod, urlParam, keyParam } =
-    resolveApiConfig(overrideKey);
+    resolveApiConfig(overrideKey, refresh);
 
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -171,7 +183,7 @@ export async function runBypass(
     };
   }
 
-  const { apiKey } = resolveApiConfig(options.apiKey);
+  const { apiKey } = resolveApiConfig(options.apiKey, options.refresh);
   const allowDemo = (readEnv("BYPASS_DEMO") || "true").toLowerCase() !== "false";
 
   if (!apiKey) {
@@ -199,7 +211,11 @@ export async function runBypass(
 
   const started = Date.now();
   try {
-    const upstream = buildUpstreamRequest(targetUrl, options.apiKey);
+    const upstream = buildUpstreamRequest(
+      targetUrl,
+      options.apiKey,
+      options.refresh,
+    );
     const response = await fetch(upstream.url, upstream.init);
     const text = await response.text();
     const durationMs = Date.now() - started;

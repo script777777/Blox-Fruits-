@@ -13,7 +13,7 @@ type BypassResponse =
   | { ok: false; error: string };
 
 type Phase = "idle" | "loading" | "success" | "error";
-type View = "home" | "contact" | "bot";
+type View = "home" | "contact" | "bot" | "pricing" | "docs";
 
 const DISCORD_INVITE = "https://discord.gg/Rn9Bh7CwAr";
 const BOT_INVITE =
@@ -55,7 +55,47 @@ const FAQ = [
   },
   {
     q: "Gibt es ein API-Limit / Plan?",
-    a: "Nein. Die API ist unbegrenzt — kein Rate-Limit, kein Plan, unendlich viele Anfragen.",
+    a: "Die Website hat kein Limit. Für die öffentliche API siehe Pricing — Monthly ist unlimited, Pay-as-you-go zählt nur erfolgreiche Requests.",
+  },
+  {
+    q: "Kann ich die API in meiner App nutzen?",
+    a: "Ja. Unter Docs findest du die Endpoints. Keys bekommst du über Discord (Buy auf der Pricing-Seite).",
+  },
+];
+
+const PLANS = [
+  {
+    id: "payg",
+    name: "Pay-as-you-go",
+    price: "$1",
+    unit: "/ 1,000 requests",
+    blurb: "Flexible credits. Only successful bypasses count toward your usage.",
+    features: [
+      "Only counts successful bypasses",
+      "Cache results are not counted",
+      "No expiry on unused credits",
+      "Full bypass catalog",
+    ],
+    cta: "Buy credits",
+    best: "Best for testing or variable traffic",
+    recommended: false,
+  },
+  {
+    id: "monthly",
+    name: "Monthly",
+    price: "$8",
+    unit: "/ 30 days",
+    blurb: "Unlimited requests with always-on access. Predictable billing for production apps.",
+    features: [
+      "Unlimited bypass requests",
+      "No daily caps",
+      "24/7 API availability",
+      "Full bypass catalog",
+      "Priority support on Discord",
+    ],
+    cta: "Get monthly access",
+    best: "Best for steady production traffic",
+    recommended: true,
   },
 ];
 
@@ -140,6 +180,16 @@ function App() {
 
   function goBot() {
     setView("bot");
+    setMenuOpen(false);
+  }
+
+  function goPricing() {
+    setView("pricing");
+    setMenuOpen(false);
+  }
+
+  function goDocs() {
+    setView("docs");
     setMenuOpen(false);
   }
 
@@ -264,15 +314,15 @@ function App() {
           <a href="#why" onClick={() => setView("home")}>
             Supported
           </a>
-          <a href="#faq" onClick={() => setView("home")}>
+          <button type="button" className={view === "pricing" ? "active" : ""} onClick={goPricing}>
             Pricing
-          </a>
+          </button>
           <button type="button" className={view === "bot" ? "active" : ""} onClick={goBot}>
             Bot
           </button>
-          <a href="#faq" onClick={() => setView("home")}>
-            Blog
-          </a>
+          <button type="button" className={view === "docs" ? "active" : ""} onClick={goDocs}>
+            Docs
+          </button>
         </nav>
 
         <div className="top-actions">
@@ -356,28 +406,15 @@ function App() {
             >
               Supported
             </a>
-            <a
-              href="#faq"
-              onClick={(e) => {
-                e.preventDefault();
-                goHome();
-                window.setTimeout(() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" }), 50);
-              }}
-            >
+            <button type="button" className={view === "pricing" ? "active" : ""} onClick={goPricing}>
               Pricing
-            </a>
+            </button>
             <button type="button" className={view === "bot" ? "active" : ""} onClick={goBot}>
               Bot
             </button>
-            <a
-              href="#faq"
-              onClick={(e) => {
-                e.preventDefault();
-                goHome();
-              }}
-            >
-              Blog
-            </a>
+            <button type="button" className={view === "docs" ? "active" : ""} onClick={goDocs}>
+              Docs
+            </button>
           </nav>
 
           <div className="site-menu-grid">
@@ -795,11 +832,11 @@ function App() {
                 <button type="button" className="chip" onClick={goHome}>
                   Supported services
                 </button>
-                <button type="button" className="chip" onClick={goHome}>
+                <button type="button" className="chip" onClick={goPricing}>
                   API pricing
                 </button>
-                <button type="button" className="chip" onClick={goHome}>
-                  FAQ
+                <button type="button" className="chip" onClick={goDocs}>
+                  API docs
                 </button>
               </div>
             </article>
@@ -889,6 +926,175 @@ function App() {
             </article>
           </section>
         ) : null}
+
+        {view === "pricing" ? (
+          <section className="page-view pricing-view">
+            <div className="pricing-hero">
+              <p className="eyebrow">API access</p>
+              <h1>Simple pricing</h1>
+              <p className="lede-left">
+                Flexible credits or unlimited monthly access. Keys are issued on Discord
+                after payment — no self-checkout.
+              </p>
+            </div>
+
+            <div className="pricing-grid">
+              {PLANS.map((plan) => (
+                <article
+                  key={plan.id}
+                  className={`pricing-card${plan.recommended ? " recommended" : ""}`}
+                >
+                  {plan.recommended ? <span className="plan-badge">Recommended</span> : null}
+                  <h2>{plan.name}</h2>
+                  <p className="plan-price">
+                    <strong>{plan.price}</strong>
+                    <span>{plan.unit}</span>
+                  </p>
+                  <p className="plan-blurb">{plan.blurb}</p>
+                  <ul className="plan-features">
+                    {plan.features.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                  <a className="primary-btn wide" href={DISCORD_INVITE} target="_blank" rel="noreferrer">
+                    {plan.cta} ↗
+                  </a>
+                  <p className="plan-best">{plan.best}</p>
+                </article>
+              ))}
+            </div>
+
+            <article className="info-card soft pay-methods">
+              <p className="eyebrow">Payment methods</p>
+              <h2>How to pay</h2>
+              <div className="pay-grid">
+                <div>
+                  <h3>Crypto</h3>
+                  <p>LTC, USDT, ETH</p>
+                </div>
+                <div>
+                  <h3>Binance</h3>
+                  <p>Pay direct</p>
+                </div>
+                <div>
+                  <h3>PayPal</h3>
+                  <p>Invoice</p>
+                </div>
+              </div>
+              <a className="outline-btn" href={DISCORD_INVITE} target="_blank" rel="noreferrer">
+                Open Discord to buy ↗
+              </a>
+            </article>
+
+            <article className="info-card">
+              <p className="eyebrow">Developers</p>
+              <h2>Ready to integrate?</h2>
+              <p className="lede-left">
+                Authenticate with <code>x-api-key</code> and call{" "}
+                <code>/api/v1/bypass</code>. Full reference on Docs.
+              </p>
+              <button type="button" className="secondary-btn" onClick={goDocs}>
+                Open API docs
+              </button>
+            </article>
+          </section>
+        ) : null}
+
+        {view === "docs" ? (
+          <section className="page-view docs-view">
+            <div className="pricing-hero">
+              <p className="eyebrow">API documentation</p>
+              <h1>Void Syndicate API</h1>
+              <p className="lede-left">
+                Resolve supported shortlinks, key systems and ad-locked URLs. Authenticate
+                with an <code>x-api-key</code> header and make simple GET requests.
+              </p>
+              <a className="primary-btn" href={DISCORD_INVITE} target="_blank" rel="noreferrer">
+                Get an API key on Discord ↗
+              </a>
+            </div>
+
+            <article className="info-card docs-block">
+              <h2>Authentication</h2>
+              <p>
+                Every request must include your API key in the <code>x-api-key</code>{" "}
+                header. Keys are issued per customer and requested on Discord (Pricing →
+                Buy).
+              </p>
+              <pre className="code-block">{`x-api-key: YOUR_API_KEY`}</pre>
+            </article>
+
+            <article className="info-card docs-block">
+              <h2>Quickstart</h2>
+              <p>
+                Send a GET request to <code>/api/v1/bypass</code> with the{" "}
+                <code>url</code> query parameter and your API key.
+              </p>
+              <pre className="code-block">{`curl -X GET "https://YOUR_DOMAIN/api/v1/bypass?url=https%3A%2F%2Flinkvertise.com%2F..." \\
+  -H "x-api-key: YOUR_API_KEY"`}</pre>
+              <pre className="code-block">{`{
+  "status": "success",
+  "result": "https://example.com/destination",
+  "time": "1.23"
+}`}</pre>
+            </article>
+
+            <article className="info-card docs-block">
+              <h2>Endpoints</h2>
+              <div className="endpoint">
+                <code className="method">GET</code>
+                <code>/api/v1/bypass?url=</code>
+                <p>Bypass a URL. Returns cached result when available. Auth required.</p>
+              </div>
+              <div className="endpoint">
+                <code className="method">GET</code>
+                <code>/api/v1/refresh?url=</code>
+                <p>Force a fresh bypass (skip cache). Auth required.</p>
+              </div>
+              <div className="endpoint">
+                <code className="method">GET</code>
+                <code>/api/v1/supported</code>
+                <p>List supported services. No auth required.</p>
+              </div>
+            </article>
+
+            <article className="info-card docs-block">
+              <h2>Errors</h2>
+              <ul className="error-list">
+                <li>
+                  <strong>400</strong> Missing or invalid <code>url</code>, or unsupported
+                  service
+                </li>
+                <li>
+                  <strong>401</strong> Missing or invalid <code>x-api-key</code>
+                </li>
+                <li>
+                  <strong>429</strong> Rate limit exceeded (rare — Monthly is unlimited)
+                </li>
+                <li>
+                  <strong>500</strong> Upstream failure — safe to retry once
+                </li>
+              </ul>
+            </article>
+
+            <article className="info-card soft">
+              <p className="eyebrow">Need a key?</p>
+              <h2>Buy access on Discord</h2>
+              <p className="lede-left">
+                Same plans as Pricing — pay-as-you-go or monthly unlimited. We issue your
+                key after payment.
+              </p>
+              <div className="chip-row">
+                <button type="button" className="chip" onClick={goPricing}>
+                  View pricing
+                </button>
+                <a className="chip" href={DISCORD_INVITE} target="_blank" rel="noreferrer">
+                  Join Discord
+                </a>
+              </div>
+            </article>
+          </section>
+        ) : null}
       </main>
 
       <footer className="footer">
@@ -927,9 +1133,15 @@ function App() {
             <button type="button" className="footer-link" onClick={goBot}>
               Bot
             </button>
+            <button type="button" className="footer-link" onClick={goPricing}>
+              Pricing
+            </button>
           </div>
           <div>
             <h4>Resources</h4>
+            <button type="button" className="footer-link" onClick={goDocs}>
+              Docs
+            </button>
             <button
               type="button"
               className="footer-link"
