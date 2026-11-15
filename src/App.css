@@ -1147,7 +1147,7 @@ div[id*="netlify"][style*="fixed"] {
   color: #5865f2 !important;
 }
 
-.zen-menu {
+.site-menu {
   position: relative;
   z-index: 35;
   padding: 0.85rem 1rem 1.25rem;
@@ -1156,14 +1156,14 @@ div[id*="netlify"][style*="fixed"] {
   animation: rise 0.28s ease both;
 }
 
-.zen-menu-links {
+.site-menu-links {
   display: grid;
   gap: 0.15rem;
   margin-bottom: 1rem;
 }
 
-.zen-menu-links a,
-.zen-menu-links button {
+.site-menu-links a,
+.site-menu-links button {
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -1175,21 +1175,21 @@ div[id*="netlify"][style*="fixed"] {
   cursor: pointer;
 }
 
-.zen-menu-links a:hover,
-.zen-menu-links button:hover,
-.zen-menu-links button.active {
+.site-menu-links a:hover,
+.site-menu-links button:hover,
+.site-menu-links button.active {
   color: var(--accent);
 }
 
-.zen-menu-grid {
+.site-menu-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.55rem;
   margin-bottom: 0.85rem;
 }
 
-.zen-menu-grid a,
-.zen-menu-grid button {
+.site-menu-grid a,
+.site-menu-grid button {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -1204,8 +1204,8 @@ div[id*="netlify"][style*="fixed"] {
   cursor: pointer;
 }
 
-.zen-menu-grid a:hover,
-.zen-menu-grid button:hover {
+.site-menu-grid a:hover,
+.site-menu-grid button:hover {
   border-color: rgba(var(--accent-rgb), 0.4);
 }
 

@@ -48,7 +48,7 @@ function extractDestination(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const data = payload as Record<string, unknown>;
 
-  // Zen API: { status: "success", result: "https://..." }
+  // Upstream success: { status: "success", result: "https://..." }
   if (data.status === "failed") return null;
   if (data.status === "success" && typeof data.result === "string") {
     return isHttpUrl(data.result) ? data.result : null;
@@ -254,7 +254,7 @@ export async function runBypass(
       body: {
         ok: true,
         destination,
-        provider: readEnv("BYPASS_API_PROVIDER") || "izen",
+        provider: readEnv("BYPASS_API_PROVIDER") || "upstream",
         durationMs,
       },
     };

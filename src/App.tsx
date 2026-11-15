@@ -39,7 +39,7 @@ const FAQ = [
   },
   {
     q: "Brauche ich einen API-Key?",
-    a: "Für den normalen Single-Modus nicht zwingend. Mit Key läuft der Bypass ohne Captcha über die Zen-API.",
+    a: "Für den normalen Single-Modus nicht zwingend. Mit Key läuft der Bypass ohne Captcha über die API.",
   },
   {
     q: "Welche Dienste werden unterstützt?",
@@ -55,7 +55,7 @@ const FAQ = [
   },
   {
     q: "Gibt es ein Rate-Limit?",
-    a: "Ja — abhängig vom Zen-API-Plan deines Keys. Bei 429 kurz warten und erneut versuchen.",
+    a: "Ja — abhängig vom Plan deines Keys. Bei 429 kurz warten und erneut versuchen.",
   },
 ];
 
@@ -341,8 +341,8 @@ function App() {
       </header>
 
       {menuOpen ? (
-        <div className="zen-menu" role="dialog" aria-label="Menu">
-          <nav className="zen-menu-links">
+        <div className="site-menu" role="dialog" aria-label="Menu">
+          <nav className="site-menu-links">
             <button type="button" className={view === "home" ? "active" : ""} onClick={goHome}>
               Home
             </button>
@@ -380,7 +380,7 @@ function App() {
             </a>
           </nav>
 
-          <div className="zen-menu-grid">
+          <div className="site-menu-grid">
             <button
               type="button"
               onClick={() => {
@@ -642,8 +642,8 @@ function App() {
                   </div>
                   <h3>Verify captcha</h3>
                   <p>
-                    On zen.lol itself a captcha prevents abuse. With your API key
-                    Void Syndicate talks to the API directly and skips that step.
+                    Without a key, abuse protection can slow you down. With your API
+                    key Void Syndicate talks to the API directly and skips that step.
                   </p>
                 </article>
                 <article>
@@ -673,7 +673,7 @@ function App() {
                 </h3>
                 <p>
                   No paywalls, no premium tiers, no rate-limit walls on the free UI.
-                  Connect your Zen API key for captcha-free bypasses.
+                  Connect your API key for captcha-free bypasses.
                 </p>
                 <p className="supports-label">Supports</p>
                 <div className="tags">
@@ -901,7 +901,7 @@ function App() {
           </button>
           <p>
             Free bypasser for Linkvertise, Work.ink, Lootlabs, Admaven and key
-            systems. Powered by the Zen API.
+            systems. Fast, free, no wait.
           </p>
           <div className="footer-social">
             <a href={DISCORD_INVITE} target="_blank" rel="noreferrer" aria-label="Discord">
@@ -930,9 +930,16 @@ function App() {
           </div>
           <div>
             <h4>Resources</h4>
-            <a href="https://api.izen.lol/docs" target="_blank" rel="noreferrer">
-              Docs
-            </a>
+            <button
+              type="button"
+              className="footer-link"
+              onClick={() => {
+                goHome();
+                window.setTimeout(() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" }), 50);
+              }}
+            >
+              FAQ
+            </button>
             <a href={DISCORD_INVITE} target="_blank" rel="noreferrer">
               Discord
             </a>
@@ -964,17 +971,14 @@ function App() {
           >
             <h3>API key</h3>
             <p>
-              From{" "}
-              <a href="https://api.izen.lol/docs" target="_blank" rel="noreferrer">
-                api.izen.lol
-              </a>{" "}
-              — stored locally and sent as <code>x-api-key</code>.
+              Optional — stored locally in your browser and sent as{" "}
+              <code>x-api-key</code> for captcha-free bypasses.
             </p>
             <input
               type="password"
               value={draftKey}
               onChange={(e) => setDraftKey(e.target.value)}
-              placeholder="izen_..."
+              placeholder="your-api-key"
               autoComplete="off"
             />
             <div className="modal-actions">

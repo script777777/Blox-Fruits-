@@ -1,15 +1,6 @@
 # Void Syndicate
 
-Link-Bypass-UI im Stil von [izen.lol](https://izen.lol/) (Zen Bypass), angebunden an die **Zen API**.
-
-## API
-
-Dokumentation: https://api.izen.lol/docs
-
-```http
-GET https://api.izen.lol/v1/bypass?url=<encoded>
-x-api-key: <dein_key>
-```
+Free link bypasser for Linkvertise, Work.ink, Lootlabs, Admaven and more.
 
 ## Lokal
 
