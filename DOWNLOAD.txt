@@ -1,0 +1,11 @@
+Void Syndicate – Download
+
+1) Diese Datei + Void-Syndicate.zip aus dem Repo laden
+   oder den ganzen Branch als ZIP:
+   https://github.com/script777777/Blox-Fruits-/archive/refs/heads/cursor/openlink-bypass-4686.zip
+
+2) Entpacken, dann:
+   npm install
+   npm run dev
+
+3) API-Key: liegt in .env (oder auf der Seite unter "Add API key")
