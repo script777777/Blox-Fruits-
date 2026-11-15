@@ -430,35 +430,34 @@ function App() {
                   <h2>Enter your link</h2>
                   <p>We'll bypass it for you and get you to your destination or result.</p>
                 </div>
-              </div>
-
-              <div className="toolbar">
-                <div className="mode-toggle" role="tablist">
+                <div className="toolbar">
+                  <div className="mode-toggle" role="tablist">
+                    <button
+                      type="button"
+                      className={mode === "single" ? "active" : ""}
+                      onClick={() => setMode("single")}
+                    >
+                      Single
+                    </button>
+                    <button
+                      type="button"
+                      className={mode === "bulk" ? "active" : ""}
+                      onClick={() => setMode("bulk")}
+                    >
+                      Bulk
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    className={mode === "single" ? "active" : ""}
-                    onClick={() => setMode("single")}
+                    className="text-link muted-link"
+                    onClick={() => {
+                      setDraftKey(apiKey);
+                      setShowKeyModal(true);
+                    }}
                   >
-                    Single
-                  </button>
-                  <button
-                    type="button"
-                    className={mode === "bulk" ? "active" : ""}
-                    onClick={() => setMode("bulk")}
-                  >
-                    Bulk
+                    {hasKey ? "API key saved" : "Add API key"}
                   </button>
                 </div>
-                <button
-                  type="button"
-                  className="text-link muted-link"
-                  onClick={() => {
-                    setDraftKey(apiKey);
-                    setShowKeyModal(true);
-                  }}
-                >
-                  {hasKey ? "API key saved" : "Add API key"}
-                </button>
               </div>
 
               <form onSubmit={onSubmit} className="bypass-form">
