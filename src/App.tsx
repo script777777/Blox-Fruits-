@@ -61,7 +61,19 @@ function App() {
   async function copyDestination() {
     if (!destination) return;
     try {
-      await navigator.clipboard.writeText(destination);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(destination);
+      } else {
+        const area = document.createElement("textarea");
+        area.value = destination;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.left = "-9999px";
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        document.body.removeChild(area);
+      }
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {

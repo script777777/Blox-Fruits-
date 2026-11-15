@@ -1,32 +1,36 @@
-# React + TypeScript + Vite
+# OPENLINK
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Link-Bypass-Webseite: URL eingeben → Zielseite über deine Bypass-API freischalten.
 
-Currently, two official plugins are available:
+## Lokal starten
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Ohne `BYPASS_API_URL` / `BYPASS_API_KEY` läuft ein Demo-Modus.
+
+## API verbinden
+
+Kopiere `.env.example` nach `.env` und setze:
+
+| Variable | Bedeutung |
+|---|---|
+| `BYPASS_API_URL` | Endpoint deiner Bypass-API |
+| `BYPASS_API_KEY` | Dein API-Key |
+| `BYPASS_API_AUTH` | `query` (Standard), `header`, `bearer` oder `authorization` |
+| `BYPASS_API_METHOD` | `GET` (Standard) oder `POST` |
+| `BYPASS_API_URL_PARAM` | Query/Body-Feld für die URL (Standard `url`) |
+| `BYPASS_API_KEY_PARAM` | Query/Body-Feld für den Key (Standard `api_key`) |
+
+Der Key bleibt serverseitig in der Netlify Function `/api/bypass` — nie im Browser.
+
+## Deploy (Netlify)
+
+```bash
+npm run build
+npx netlify deploy
+```
+
+Setze dieselben Env-Vars in den Netlify Site Settings.
