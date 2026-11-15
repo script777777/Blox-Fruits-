@@ -9,9 +9,9 @@ export default async (req: Request, _context: Context) => {
     );
   }
 
-  let body: { url?: string };
+  let body: { url?: string; apiKey?: string };
   try {
-    body = (await req.json()) as { url?: string };
+    body = (await req.json()) as { url?: string; apiKey?: string };
   } catch {
     return Response.json(
       { ok: false, error: "Ungültiger JSON-Body" },
@@ -19,7 +19,7 @@ export default async (req: Request, _context: Context) => {
     );
   }
 
-  const result = await runBypass(body.url || "");
+  const result = await runBypass(body.url || "", { apiKey: body.apiKey });
   return Response.json(result.body, {
     status: result.status,
     headers: { "Cache-Control": "no-store" },

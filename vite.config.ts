@@ -24,8 +24,12 @@ function bypassDevApi(): Plugin {
         req.on("end", async () => {
           try {
             const raw = Buffer.concat(chunks).toString("utf8");
-            const parsed = raw ? (JSON.parse(raw) as { url?: string }) : {};
-            const result = await runBypass(parsed.url || "");
+            const parsed = raw
+              ? (JSON.parse(raw) as { url?: string; apiKey?: string })
+              : {};
+            const result = await runBypass(parsed.url || "", {
+              apiKey: parsed.apiKey,
+            });
             res.statusCode = result.status;
             res.setHeader("Content-Type", "application/json");
             res.setHeader("Cache-Control", "no-store");

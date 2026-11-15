@@ -1,36 +1,30 @@
 # OPENLINK
 
-Link-Bypass-Webseite: URL eingeben → Zielseite über deine Bypass-API freischalten.
+Link-Bypass-UI im Stil von [izen.lol](https://izen.lol/), angebunden an die **Zen API**.
 
-## Lokal starten
+## API
+
+Dokumentation: https://api.izen.lol/docs
+
+```http
+GET https://api.izen.lol/v1/bypass?url=<encoded>
+x-api-key: <dein_key>
+```
+
+Antwort (Erfolg): `{ "status": "success", "result": "https://..." }`
+
+## Lokal
 
 ```bash
 npm install
 npm run dev
 ```
 
-Ohne `BYPASS_API_URL` / `BYPASS_API_KEY` läuft ein Demo-Modus.
+1. Im UI **Add API key** → Key speichern (localStorage), **oder**
+2. `.env` mit `BYPASS_API_KEY=...` (serverseitig)
 
-## API verbinden
+Ohne Key: Demo-Modus.
 
-Kopiere `.env.example` nach `.env` und setze:
+## Deploy
 
-| Variable | Bedeutung |
-|---|---|
-| `BYPASS_API_URL` | Endpoint deiner Bypass-API |
-| `BYPASS_API_KEY` | Dein API-Key |
-| `BYPASS_API_AUTH` | `query` (Standard), `header`, `bearer` oder `authorization` |
-| `BYPASS_API_METHOD` | `GET` (Standard) oder `POST` |
-| `BYPASS_API_URL_PARAM` | Query/Body-Feld für die URL (Standard `url`) |
-| `BYPASS_API_KEY_PARAM` | Query/Body-Feld für den Key (Standard `api_key`) |
-
-Der Key bleibt serverseitig in der Netlify Function `/api/bypass` — nie im Browser.
-
-## Deploy (Netlify)
-
-```bash
-npm run build
-npx netlify deploy
-```
-
-Setze dieselben Env-Vars in den Netlify Site Settings.
+Netlify: Build `npm run build`, Publish `dist`. Env-Vars wie in `.env.example`.
