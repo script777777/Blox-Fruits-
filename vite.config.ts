@@ -1,10 +1,18 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import { runBypass } from "./src/server/bypassCore.ts";
 
 function bypassDevApi(): Plugin {
   return {
     name: "void-syndicate-bypass-dev-api",
+    configResolved(config) {
+      const env = loadEnv(config.mode, config.root, "");
+      for (const [key, value] of Object.entries(env)) {
+        if (process.env[key] === undefined) {
+          process.env[key] = value;
+        }
+      }
+    },
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         if (req.url?.split("?")[0] !== "/api/bypass") {
