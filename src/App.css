@@ -26,6 +26,8 @@
   color: var(--ink);
   font-weight: 700;
   text-decoration: none;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
 .logo-mark {

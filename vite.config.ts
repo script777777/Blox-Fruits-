@@ -4,7 +4,7 @@ import { runBypass } from "./src/server/bypassCore.ts";
 
 function bypassDevApi(): Plugin {
   return {
-    name: "openlink-bypass-dev-api",
+    name: "void-syndicate-bypass-dev-api",
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         if (req.url?.split("?")[0] !== "/api/bypass") {

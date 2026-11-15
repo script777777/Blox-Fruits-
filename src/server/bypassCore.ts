@@ -116,7 +116,7 @@ function buildUpstreamRequest(
 
   const headers: Record<string, string> = {
     Accept: "application/json",
-    "User-Agent": "OpenLink/1.0",
+    "User-Agent": "VoidSyndicate/1.0",
   };
 
   if (apiKey) {

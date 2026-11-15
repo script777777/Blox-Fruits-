@@ -28,7 +28,7 @@ const SUPPORTS = [
 
 const FAQ = [
   {
-    q: "Ist OPENLINK wirklich kostenlos?",
+    q: "Ist Void Syndicate wirklich kostenlos?",
     a: "Ja. Einzelne Bypass-Anfragen funktionieren ohne Abo. Ein optionaler API-Key schaltet Bulk-Modus frei und überspringt Captchas auf der Original-API.",
   },
   {
@@ -53,7 +53,7 @@ const FAQ = [
   },
 ];
 
-const API_KEY_STORAGE = "openlink_api_key";
+const API_KEY_STORAGE = "void_syndicate_api_key";
 
 function formatDuration(ms: number | undefined, elapsed: number): string {
   const value = ms ?? elapsed;
@@ -223,7 +223,7 @@ function App() {
           <span className="logo-mark">
             <LightningIcon />
           </span>
-          <span>openlink.app</span>
+          <span>Void Syndicate</span>
         </a>
         <div className="top-actions">
           <button
@@ -303,7 +303,7 @@ function App() {
             Skip the wait. <span>Get to the link.</span>
           </h1>
           <p className="lede">
-            Paste any supported link and let OpenLink take care of the redirects,
+            Paste any supported link and let Void Syndicate take care of the redirects,
             timers, and clutter.
           </p>
           <ul className="checks">
@@ -505,7 +505,7 @@ function App() {
               <h3>Verify captcha</h3>
               <p>
                 On zen.lol itself a captcha prevents abuse. With your API key
-                OpenLink talks to the API directly and skips that step.
+                Void Syndicate talks to the API directly and skips that step.
               </p>
             </article>
             <article>
@@ -521,7 +521,7 @@ function App() {
 
         <section id="why" className="section">
           <p className="eyebrow">Why us</p>
-          <h2>Why choose OpenLink?</h2>
+          <h2>Why choose Void Syndicate?</h2>
           <div className="feature">
             <div className="feature-icon">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -590,7 +590,7 @@ function App() {
           </div>
           <div className="contact-block">
             <p>Still have a question? We're happy to help.</p>
-            <a className="outline-btn" href="mailto:hello@openlink.app">
+            <a className="outline-btn" href="mailto:contact@voidsyndicate.app">
               Contact us ↗
             </a>
           </div>
@@ -603,7 +603,7 @@ function App() {
             <span className="logo-mark">
               <LightningIcon />
             </span>
-            <span>openlink.app</span>
+            <span>Void Syndicate</span>
           </div>
           <p>
             Free bypasser for Linkvertise, Work.ink, Lootlabs, Admaven and key
@@ -630,14 +630,14 @@ function App() {
             <h4>Legal</h4>
             <a href="#faq">Terms</a>
             <a href="#faq">Privacy</a>
-            <a href="mailto:hello@openlink.app">Contact</a>
+            <a href="mailto:contact@voidsyndicate.app">Contact</a>
           </div>
         </div>
         <div className="footer-bottom">
           <span className="status">
             <i /> Operational
           </span>
-          <span>openlink.app © 2026</span>
+          <span>Void Syndicate © 2026</span>
         </div>
       </footer>
 

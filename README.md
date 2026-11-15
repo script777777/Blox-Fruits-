@@ -1,6 +1,6 @@
-# OPENLINK
+# Void Syndicate
 
-Link-Bypass-UI im Stil von [izen.lol](https://izen.lol/), angebunden an die **Zen API**.
+Link-Bypass-UI im Stil von [izen.lol](https://izen.lol/) (Zen Bypass), angebunden an die **Zen API**.
 
 ## API
 
@@ -11,8 +11,6 @@ GET https://api.izen.lol/v1/bypass?url=<encoded>
 x-api-key: <dein_key>
 ```
 
-Antwort (Erfolg): `{ "status": "success", "result": "https://..." }`
-
 ## Lokal
 
 ```bash
@@ -20,8 +18,8 @@ npm install
 npm run dev
 ```
 
-1. Im UI **Add API key** → Key speichern (localStorage), **oder**
-2. `.env` mit `BYPASS_API_KEY=...` (serverseitig)
+1. Im UI **Add API key** → Key speichern, **oder**
+2. `.env` mit `BYPASS_API_KEY=...`
 
 Ohne Key: Demo-Modus.
 
