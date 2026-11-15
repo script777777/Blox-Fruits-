@@ -225,7 +225,25 @@ function App() {
           </span>
           <span>Void Syndicate</span>
         </a>
+
+        <nav className="desktop-nav" aria-label="Primary">
+          <a href="#top" className="active">
+            Home
+          </a>
+          <a href="#why">Supported</a>
+          <a href="#faq">Pricing</a>
+          <a href="#how">Bot</a>
+          <a href="#faq">Blog</a>
+        </nav>
+
         <div className="top-actions">
+          <button type="button" className="icon-btn" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7" />
+              <path d="M10 19a2 2 0 0 0 4 0" />
+            </svg>
+            <span className="dot" />
+          </button>
           <button
             type="button"
             className="icon-btn"
@@ -241,15 +259,34 @@ function App() {
             </svg>
             {hasKey ? <span className="dot" /> : null}
           </button>
+          <a className="icon-btn desktop-only" href="#faq" aria-label="Status">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M3 12h4l2-5 4 10 2-5h6" />
+            </svg>
+          </a>
+          <a className="icon-btn desktop-only" href="mailto:contact@voidsyndicate.app" aria-label="Mail">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <path d="m3 7 9 7 9-7" />
+            </svg>
+          </a>
           <a className="icon-btn" href="https://discord.com" target="_blank" rel="noreferrer" aria-label="Discord">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
               <path d="M19.3 5.2A16 16 0 0 0 15.2 4l-.3.6c1.5.4 2.3 1 3 1.7-1.3-.6-2.6-1-4-1.2a13 13 0 0 0-4 0c-1.4.2-2.7.6-4 1.2.7-.7 1.6-1.3 3-1.7L8.6 4A16 16 0 0 0 4.5 5.2C2.3 8.6 1.7 11.9 2 15.2a16 16 0 0 0 5 2.5l.7-1.1a10 10 0 0 1-1.6-.8l.4-.3c3 1.4 6.3 1.4 9.2 0l.4.3c-.5.3-1 .6-1.6.8l.7 1.1a16 16 0 0 0 5-2.5c.4-3.8-.5-7.1-2.4-10zm-10 8.2c-.9 0-1.6-.8-1.6-1.8s.7-1.8 1.6-1.8 1.7.8 1.6 1.8-.7 1.8-1.6 1.8zm5.4 0c-.9 0-1.6-.8-1.6-1.8s.7-1.8 1.6-1.8 1.7.8 1.6 1.8-.7 1.8-1.6 1.8z" />
             </svg>
           </a>
+          <a
+            className="login-btn desktop-only"
+            href="https://discord.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Login
+          </a>
           <button
             type="button"
-            className="icon-btn"
-            aria-label="Menü"
+            className="icon-btn mobile-only"
+            aria-label="Menu"
             onClick={() => setMenuOpen((v) => !v)}
           >
             {menuOpen ? (
@@ -270,14 +307,17 @@ function App() {
           <a href="#top" onClick={() => setMenuOpen(false)}>
             Home
           </a>
-          <a href="#how" onClick={() => setMenuOpen(false)}>
-            How it works
-          </a>
           <a href="#why" onClick={() => setMenuOpen(false)}>
-            Why us
+            Supported
           </a>
           <a href="#faq" onClick={() => setMenuOpen(false)}>
-            FAQ
+            Pricing
+          </a>
+          <a href="#how" onClick={() => setMenuOpen(false)}>
+            Bot
+          </a>
+          <a href="#faq" onClick={() => setMenuOpen(false)}>
+            Blog
           </a>
           <button
             type="button"
@@ -290,6 +330,9 @@ function App() {
           >
             API key
           </button>
+          <a className="login-btn menu-login" href="https://discord.com" target="_blank" rel="noreferrer">
+            Login
+          </a>
         </div>
       ) : null}
 
@@ -300,11 +343,13 @@ function App() {
             Fast, free link bypassing
           </p>
           <h1>
-            Skip the wait. <span>Get to the link.</span>
+            Skip the wait.
+            <span>Get to the link.</span>
           </h1>
           <p className="lede">
-            Paste any supported link and let Void Syndicate take care of the redirects,
-            timers, and clutter.
+            Paste any supported link and let Void Syndicate take care of the
+            redirects, timers, and clutter.{" "}
+            <a href="#why">Browse Reference</a>
           </p>
           <ul className="checks">
             <li>100+ services</li>
@@ -406,7 +451,7 @@ function App() {
                 </div>
                 <button
                   type="button"
-                  className="text-link"
+                  className="text-link muted-link"
                   onClick={() => {
                     setDraftKey(apiKey);
                     setShowKeyModal(true);
@@ -418,38 +463,45 @@ function App() {
 
               <form onSubmit={onSubmit} className="bypass-form">
                 {mode === "single" ? (
-                  <label className="field">
-                    <span className="field-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
-                        <path d="M10 14a5 5 0 0 0 7.1 0l2.1-2.1a5 5 0 0 0-7.1-7.1L11 5.9" />
-                        <path d="M14 10a5 5 0 0 0-7.1 0L4.8 12.1a5 5 0 0 0 7.1 7.1L13 18.1" />
-                      </svg>
-                    </span>
-                    <input
-                      type="url"
+                  <div className="submit-row">
+                    <label className="field">
+                      <span className="field-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                          <path d="M10 14a5 5 0 0 0 7.1 0l2.1-2.1a5 5 0 0 0-7.1-7.1L11 5.9" />
+                          <path d="M14 10a5 5 0 0 0-7.1 0L4.8 12.1a5 5 0 0 0 7.1 7.1L13 18.1" />
+                        </svg>
+                      </span>
+                      <input
+                        type="url"
+                        required
+                        placeholder="https://linkvertise.com/..."
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                    </label>
+                    <button type="submit" className="primary-btn">
+                      Bypass <span aria-hidden="true">→</span>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <textarea
+                      className="bulk-field"
                       required
+                      rows={5}
                       placeholder={placeholders}
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      autoComplete="off"
+                      value={bulkText}
+                      onChange={(e) => setBulkText(e.target.value)}
                       spellCheck={false}
                     />
-                  </label>
-                ) : (
-                  <textarea
-                    className="bulk-field"
-                    required
-                    rows={5}
-                    placeholder={placeholders}
-                    value={bulkText}
-                    onChange={(e) => setBulkText(e.target.value)}
-                    spellCheck={false}
-                  />
+                    <button type="submit" className="primary-btn wide">
+                      Bypass <span aria-hidden="true">→</span>
+                    </button>
+                  </>
                 )}
                 {error ? <p className="error">{error}</p> : null}
-                <button type="submit" className="primary-btn wide">
-                  Bypass <span aria-hidden="true">→</span>
-                </button>
               </form>
 
               <div className="popular">
@@ -469,7 +521,7 @@ function App() {
 
         <section className="stats">
           <div>
-            <strong>46.400.000+</strong>
+            <strong>46,411,364</strong>
             <span>Links bypassed</span>
           </div>
           <div>
