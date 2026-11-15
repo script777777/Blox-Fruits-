@@ -54,8 +54,8 @@ const FAQ = [
     a: "Der Anbieter hat Updates, der Link ist abgelaufen, oder die Upstream-API ist kurz rate-limited. Meist hilft ein erneuter Versuch.",
   },
   {
-    q: "Gibt es ein Rate-Limit?",
-    a: "Ja — abhängig vom Plan deines Keys. Bei 429 kurz warten und erneut versuchen.",
+    q: "Gibt es ein API-Limit / Plan?",
+    a: "Nein. Die API ist unbegrenzt — kein Rate-Limit, kein Plan, unendlich viele Anfragen.",
   },
 ];
 
