@@ -1207,6 +1207,13 @@ div[id*="netlify"][style*="fixed"] {
   width: 100%;
   margin-left: 0;
   gap: 0.45rem;
+  background: var(--discord) !important;
+  color: #fff !important;
+  box-shadow: none;
+}
+
+.menu-login::after {
+  display: none;
 }
 
 .page-view {
