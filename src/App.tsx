@@ -13,7 +13,7 @@ type BypassResponse =
   | { ok: false; error: string; apiResponse?: string };
 
 type Phase = "idle" | "loading" | "success" | "error";
-type View = "home" | "contact" | "bot" | "pricing" | "docs";
+type View = "home" | "contact" | "bot" | "pricing" | "docs" | "extension";
 
 const DISCORD_INVITE = "https://discord.gg/Rn9Bh7CwAr";
 const BOT_INVITE =
@@ -195,6 +195,11 @@ function App() {
 
   function goDocs() {
     setView("docs");
+    setMenuOpen(false);
+  }
+
+  function goExtension() {
+    setView("extension");
     setMenuOpen(false);
   }
 
@@ -387,6 +392,9 @@ function App() {
           <button type="button" className={view === "docs" ? "active" : ""} onClick={goDocs}>
             Docs
           </button>
+          <button type="button" className={view === "extension" ? "active" : ""} onClick={goExtension}>
+            Extension
+          </button>
         </nav>
 
         <div className="top-actions">
@@ -478,6 +486,9 @@ function App() {
             </button>
             <button type="button" className={view === "docs" ? "active" : ""} onClick={goDocs}>
               Docs
+            </button>
+            <button type="button" className={view === "extension" ? "active" : ""} onClick={goExtension}>
+              Extension
             </button>
           </nav>
 
@@ -1206,6 +1217,99 @@ function App() {
             </article>
           </section>
         ) : null}
+
+        {view === "extension" ? (
+          <section className="page-view extension-view">
+            <div className="pricing-hero">
+              <p className="eyebrow">Browser extension</p>
+              <h1>Bypass without leaving the page</h1>
+              <p className="lede-left">
+                Right-click any link, use the toolbar popup, or tap the floating Void
+                button on Linkvertise / Work.ink / Lootlabs — result opens instantly.
+              </p>
+              <a className="primary-btn" href="/void-syndicate-extension.zip" download>
+                Download extension ZIP ↗
+              </a>
+            </div>
+
+            <article className="info-card glow">
+              <p className="eyebrow">What you get</p>
+              <ul className="checks-left">
+                <li>Toolbar popup with Paste + Bypass</li>
+                <li>Right-click → “Bypass with Void Syndicate”</li>
+                <li>Floating button on supported adlink sites</li>
+                <li>Uses your Void API key (`vs_…`) securely in the browser</li>
+              </ul>
+            </article>
+
+            <article className="info-card">
+              <p className="eyebrow">Install — Chrome / Edge / Brave</p>
+              <h2>Load unpacked (2 minutes)</h2>
+              <ol className="numbered-steps">
+                <li>
+                  <span>1</span>
+                  <p>
+                    Download the ZIP and <strong>unzip</strong> it (you need the folder,
+                    not the ZIP itself).
+                  </p>
+                </li>
+                <li>
+                  <span>2</span>
+                  <p>
+                    Open <code>chrome://extensions</code> (or <code>edge://extensions</code>)
+                    and enable <strong>Developer mode</strong>.
+                  </p>
+                </li>
+                <li>
+                  <span>3</span>
+                  <p>
+                    Click <strong>Load unpacked</strong> and select the unzipped{" "}
+                    <code>extension</code> folder.
+                  </p>
+                </li>
+                <li>
+                  <span>4</span>
+                  <p>
+                    Open the extension popup → paste your <code>vs_…</code> API key →
+                    Save. Get a key on Pricing / Discord if you don’t have one.
+                  </p>
+                </li>
+              </ol>
+              <div className="chip-row">
+                <a className="chip" href="/void-syndicate-extension.zip" download>
+                  Download ZIP
+                </a>
+                <button type="button" className="chip" onClick={goPricing}>
+                  Get API key
+                </button>
+              </div>
+            </article>
+
+            <article className="info-card">
+              <p className="eyebrow">Firefox</p>
+              <h2>Temporary add-on</h2>
+              <ol className="numbered-steps">
+                <li>
+                  <span>1</span>
+                  <p>
+                    Open <code>about:debugging#/runtime/this-firefox</code>
+                  </p>
+                </li>
+                <li>
+                  <span>2</span>
+                  <p>
+                    <strong>Load Temporary Add-on…</strong> → pick{" "}
+                    <code>manifest.json</code> from the unzipped folder.
+                  </p>
+                </li>
+              </ol>
+              <p className="lede-left">
+                Chrome Web Store publish comes later (one-time $5 developer fee). Until
+                then, Developer mode install works for you and your Discord members.
+              </p>
+            </article>
+          </section>
+        ) : null}
       </main>
 
       <footer className="footer">
@@ -1252,6 +1356,9 @@ function App() {
             <h4>Resources</h4>
             <button type="button" className="footer-link" onClick={goDocs}>
               Docs
+            </button>
+            <button type="button" className="footer-link" onClick={goExtension}>
+              Extension
             </button>
             <button
               type="button"

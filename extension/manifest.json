@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "Void Syndicate Bypass",
+  "version": "1.0.0",
+  "description": "Bypass Linkvertise, Work.ink, Lootlabs and more — without leaving the page.",
+  "action": {
+    "default_title": "Void Syndicate",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["storage", "contextMenus", "activeTab", "clipboardWrite"],
+  "host_permissions": [
+    "https://void-syndicate-954.netlify.app/*",
+    "http://localhost/*",
+    "*://linkvertise.com/*",
+    "*://*.linkvertise.com/*",
+    "*://link-to.net/*",
+    "*://link-center.net/*",
+    "*://link-target.net/*",
+    "*://direct-link.net/*",
+    "*://work.ink/*",
+    "*://loot-link.com/*",
+    "*://lootlabs.com/*",
+    "*://lootdest.com/*",
+    "*://rekonise.com/*",
+    "*://platoboost.com/*",
+    "*://shortfly.com/*",
+    "*://lockr.so/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://linkvertise.com/*",
+        "*://*.linkvertise.com/*",
+        "*://link-to.net/*",
+        "*://link-center.net/*",
+        "*://link-target.net/*",
+        "*://direct-link.net/*",
+        "*://work.ink/*",
+        "*://loot-link.com/*",
+        "*://lootlabs.com/*",
+        "*://lootdest.com/*",
+        "*://rekonise.com/*",
+        "*://platoboost.com/*",
+        "*://shortfly.com/*",
+        "*://lockr.so/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "extension@voidsyndicate.app",
+      "strict_min_version": "109.0"
+    }
+  }
+}

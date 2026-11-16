@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Void Syndicate</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="head">
+      <img src="icons/icon-32.png" width="22" height="22" alt="" />
+      <div>
+        <strong>Void Syndicate</strong>
+        <span>Bypass from any tab</span>
+      </div>
+    </header>
+
+    <label class="field">
+      <span>API key</span>
+      <input id="apiKey" type="password" placeholder="vs_…" autocomplete="off" />
+    </label>
+
+    <label class="field">
+      <span>Link</span>
+      <input id="url" type="url" placeholder="https://linkvertise.com/…" autocomplete="off" />
+    </label>
+
+    <div class="actions">
+      <button id="pasteBtn" type="button" class="ghost">Paste</button>
+      <button id="bypassBtn" type="button" class="primary">Bypass →</button>
+    </div>
+
+    <p id="status" class="status" hidden></p>
+    <a id="openResult" class="result" hidden target="_blank" rel="noopener"></a>
+
+    <footer class="foot">
+      <a href="https://void-syndicate-954.netlify.app/#pricing" target="_blank" rel="noreferrer">Get a key</a>
+      <a href="https://void-syndicate-954.netlify.app" target="_blank" rel="noreferrer">Open site</a>
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

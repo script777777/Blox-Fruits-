@@ -1,0 +1,63 @@
+.void-syndicate-bar {
+  position: fixed;
+  z-index: 2147483646;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(181, 108, 255, 0.35);
+  background: rgba(10, 8, 18, 0.92);
+  color: #faf7ff;
+  font: 600 13px/1 Geist, Inter, system-ui, sans-serif;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 24px rgba(181, 108, 255, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.void-syndicate-mark {
+  color: #b56cff;
+  filter: drop-shadow(0 0 8px rgba(181, 108, 255, 0.55));
+}
+
+.void-syndicate-label {
+  opacity: 0.85;
+}
+
+.void-syndicate-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #c084fc, #b56cff 45%, #7c3aed);
+  color: #12081c;
+  font: 700 12px/1 Geist, Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.void-syndicate-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.void-syndicate-toast {
+  position: fixed;
+  z-index: 2147483647;
+  left: 50%;
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 72px));
+  transform: translateX(-50%);
+  max-width: min(92vw, 420px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(18, 16, 28, 0.96);
+  border: 1px solid rgba(181, 108, 255, 0.35);
+  color: #e9d5ff;
+  font: 600 13px/1.35 Geist, Inter, system-ui, sans-serif;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.void-syndicate-toast.error {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+  background: rgba(40, 12, 16, 0.96);
+}
