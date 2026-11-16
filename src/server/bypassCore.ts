@@ -91,6 +91,52 @@ function extractError(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function issuedVoidKeys(): Set<string> {
+  const raw = readEnv("VOID_API_KEYS") || "";
+  return new Set(
+    raw
+      .split(/[\s,]+/)
+      .map((k) => k.trim())
+      .filter(Boolean),
+  );
+}
+
+/**
+ * Pick the key that goes to upstream.
+ * Void-issued keys (vs_… / VOID_API_KEYS) must NEVER be forwarded —
+ * they only authorize our API; upstream always uses BYPASS_API_KEY.
+ */
+function resolveUpstreamKey(clientKey?: string): string | undefined {
+  const master = readEnv("BYPASS_API_KEY");
+  const trimmed = clientKey?.trim();
+  if (!trimmed) return master;
+
+  if (trimmed.startsWith("vs_") || issuedVoidKeys().has(trimmed)) {
+    return master;
+  }
+
+  // User pasted their own upstream provider key
+  return trimmed;
+}
+
+function humanizeUpstreamError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("invalid linkvertise") || lower.includes("invalid url")) {
+    return "This link looks invalid or incomplete. Paste the full URL and try again.";
+  }
+  if (
+    lower.includes("failed to get result") ||
+    lower.includes("try again later") ||
+    lower.includes("bypass failed")
+  ) {
+    return "Bypass failed for this link (expired, unsupported, or temporarily unavailable). Try again or use another link.";
+  }
+  if (lower.includes("provided key is invalid") || lower.includes("unauthorized")) {
+    return "API key is invalid. Clear it under “Add API key” or paste a valid key.";
+  }
+  return message;
+}
+
 function resolveApiConfig(
   overrideKey?: string,
   refresh = false,
@@ -110,7 +156,7 @@ function resolveApiConfig(
   }
   return {
     apiUrl,
-    apiKey: overrideKey?.trim() || readEnv("BYPASS_API_KEY"),
+    apiKey: resolveUpstreamKey(overrideKey),
     authMode: (readEnv("BYPASS_API_AUTH") || "header").toLowerCase(),
     httpMethod: (readEnv("BYPASS_API_METHOD") || "GET").toUpperCase(),
     urlParam: readEnv("BYPASS_API_URL_PARAM") || "url",
@@ -120,11 +166,13 @@ function resolveApiConfig(
 
 function buildUpstreamRequest(
   targetUrl: string,
-  overrideKey?: string,
+  upstreamKey?: string,
   refresh = false,
 ): { url: string; init: RequestInit } {
+  // upstreamKey is already resolved — pass as override so resolveApiConfig
+  // does not re-map empty → master incorrectly when key is intentionally set.
   const { apiUrl, apiKey, authMode, httpMethod, urlParam, keyParam } =
-    resolveApiConfig(overrideKey, refresh);
+    resolveApiConfig(upstreamKey, refresh);
 
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -183,7 +231,7 @@ export async function runBypass(
     };
   }
 
-  const { apiKey } = resolveApiConfig(options.apiKey, options.refresh);
+  const apiKey = resolveUpstreamKey(options.apiKey);
   const allowDemo = (readEnv("BYPASS_DEMO") || "true").toLowerCase() !== "false";
 
   if (!apiKey) {
@@ -213,7 +261,7 @@ export async function runBypass(
   try {
     const upstream = buildUpstreamRequest(
       targetUrl,
-      options.apiKey,
+      apiKey,
       options.refresh,
     );
     const response = await fetch(upstream.url, upstream.init);
@@ -232,7 +280,9 @@ export async function runBypass(
         status: response.status === 401 || response.status === 429 ? response.status : 502,
         body: {
           ok: false,
-          error: extractError(payload, `API-Fehler (${response.status})`),
+          error: humanizeUpstreamError(
+            extractError(payload, `API-Fehler (${response.status})`),
+          ),
         },
       };
     }
@@ -246,7 +296,9 @@ export async function runBypass(
         status: 502,
         body: {
           ok: false,
-          error: extractError(payload, "Bypass fehlgeschlagen"),
+          error: humanizeUpstreamError(
+            extractError(payload, "Bypass fehlgeschlagen"),
+          ),
         },
       };
     }
