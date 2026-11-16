@@ -35,7 +35,7 @@
   height: min(40vw, 360px);
   bottom: 8%;
   left: -8%;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.35), transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18), transparent 70%);
   animation-delay: -5s;
 }
 
@@ -273,7 +273,7 @@
   border: 1px solid rgba(var(--accent-rgb), 0.18);
   border-radius: 16px;
   background:
-    linear-gradient(180deg, rgba(28, 22, 40, 0.95), rgba(14, 12, 20, 0.98));
+    linear-gradient(180deg, rgba(24, 24, 24, 0.95), rgba(12, 12, 12, 0.98));
   box-shadow:
     0 24px 60px rgba(0, 0, 0, 0.45),
     0 0 0 1px rgba(var(--accent-rgb), 0.05),
@@ -470,10 +470,10 @@
 .primary-btn {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #c084fc, var(--accent) 45%, #7c3aed);
-  color: #12081c;
+  background: linear-gradient(135deg, #ffffff, #f3f3f3 45%, #d4d4d4);
+  color: #0a0a0a;
   transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.28);
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.12);
 }
 
 .primary-btn::after {
@@ -491,11 +491,11 @@
 }
 
 .primary-btn:hover {
-  background: linear-gradient(135deg, #d8b4fe, var(--accent-hover) 50%, #6d28d9);
+  background: linear-gradient(135deg, #ffffff, #fafafa 50%, #e5e5e5);
   text-decoration: none;
   transform: translateY(-1px);
   filter: brightness(1.05);
-  box-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.38);
+  box-shadow: 0 12px 28px rgba(255, 255, 255, 0.2);
 }
 
 .primary-btn:active {

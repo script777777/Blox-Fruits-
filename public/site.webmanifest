@@ -4,8 +4,8 @@
   "description": "Skip the wait. Get to the link.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#07060c",
-  "theme_color": "#b56cff",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "icons": [
     {
       "src": "/icon-192.png",
