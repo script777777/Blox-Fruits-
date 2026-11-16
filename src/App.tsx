@@ -140,12 +140,16 @@ function App() {
   const [elapsed, setElapsed] = useState(0);
   const [durationMs, setDurationMs] = useState<number | undefined>();
   const [copied, setCopied] = useState(false);
+  const [pasted, setPasted] = useState(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  const [canShare, setCanShare] = useState(false);
   const [openFaq, setOpenFaq] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem(API_KEY_STORAGE) || "";
     setApiKey(saved);
     setDraftKey(saved);
+    setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
   }, []);
 
   useEffect(() => {
@@ -252,6 +256,7 @@ function App() {
         setDemo(Boolean(first.demo));
         setDurationMs(first.durationMs);
         setPhase("success");
+        void copyText(first.destination);
         return;
       }
 
@@ -266,11 +271,25 @@ function App() {
       setDemo(Boolean(data.demo));
       setDurationMs(data.durationMs);
       setPhase("success");
+      void copyText(data.destination);
     } catch (err) {
       setPhase("error");
       setError("Network error — please try again.");
       setApiResponse(err instanceof Error ? err.message : "Network request failed");
     }
+  }
+
+  function extractClipboardUrl(text: string): string {
+    const trimmed = text.trim();
+    if (!trimmed) return "";
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") return trimmed;
+    } catch {
+      // fall through — try to find a URL inside pasted text
+    }
+    const match = trimmed.match(/https?:\/\/[^\s<>"'`]+/i);
+    return match ? match[0].replace(/[),.;]+$/, "") : trimmed;
   }
 
   async function copyText(value: string) {
@@ -289,10 +308,47 @@ function App() {
         document.body.removeChild(area);
       }
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setError("Copy failed");
     }
+  }
+
+  async function pasteFromClipboard() {
+    setPasteError(null);
+    try {
+      if (!navigator.clipboard?.readText) {
+        setPasteError("Clipboard paste isn’t available in this browser.");
+        return;
+      }
+      const raw = await navigator.clipboard.readText();
+      const next = extractClipboardUrl(raw);
+      if (!next) {
+        setPasteError("Clipboard is empty.");
+        return;
+      }
+      setUrl(next);
+      setPasted(true);
+      window.setTimeout(() => setPasted(false), 1400);
+    } catch {
+      setPasteError("Allow clipboard access to paste.");
+    }
+  }
+
+  async function shareResult(value: string) {
+    if (canShare) {
+      try {
+        await navigator.share({
+          title: "Void Syndicate",
+          text: value,
+          url: value,
+        });
+        return;
+      } catch {
+        // user cancelled or share failed — fall through to copy
+      }
+    }
+    await copyText(value);
   }
 
   function resetResult() {
@@ -301,6 +357,8 @@ function App() {
     setError(null);
     setApiResponse(null);
     setDemo(false);
+    setCopied(false);
+    setPasteError(null);
   }
 
   return (
@@ -525,8 +583,11 @@ function App() {
                       Close
                     </button>
                   </div>
+                  <div className={`copy-pulse${copied ? " on" : ""}`} aria-live="polite">
+                    {copied ? "Copied to clipboard" : "Ready"}
+                  </div>
                   <div className="result-box">{destination}</div>
-                  <div className="result-actions">
+                  <div className={`result-actions${canShare ? " with-share" : ""}`}>
                     <a
                       className="primary-btn"
                       href={destination}
@@ -537,11 +598,20 @@ function App() {
                     </a>
                     <button
                       type="button"
-                      className="secondary-btn"
+                      className={`secondary-btn${copied ? " copied-flash" : ""}`}
                       onClick={() => copyText(destination)}
                     >
-                      {copied ? "Copied" : "Copy"}
+                      {copied ? "Copied!" : "Copy"}
                     </button>
+                    {canShare ? (
+                      <button
+                        type="button"
+                        className="secondary-btn share-btn"
+                        onClick={() => shareResult(destination)}
+                      >
+                        Share
+                      </button>
+                    ) : null}
                   </div>
                   <button
                     type="button"
@@ -605,10 +675,25 @@ function App() {
                             required
                             placeholder={placeholders}
                             value={url}
-                            onChange={(e) => setUrl(e.target.value)}
+                            onChange={(e) => {
+                              setUrl(e.target.value);
+                              setPasteError(null);
+                            }}
                             autoComplete="off"
                             spellCheck={false}
                           />
+                          <button
+                            type="button"
+                            className={`field-paste${pasted ? " pasted" : ""}`}
+                            onClick={pasteFromClipboard}
+                            aria-label="Paste link from clipboard"
+                          >
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                              <rect x="8" y="8" width="12" height="12" rx="2" />
+                              <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+                            </svg>
+                            <span>{pasted ? "Pasted" : "Paste"}</span>
+                          </button>
                         </label>
                         <button type="submit" className="primary-btn">
                           Bypass <span aria-hidden="true">→</span>
@@ -630,6 +715,11 @@ function App() {
                         </button>
                       </>
                     )}
+                    {pasteError ? (
+                      <p className="paste-hint" role="status">
+                        {pasteError}
+                      </p>
+                    ) : null}
                     {error ? (
                       <div className="error-box" role="alert">
                         <div className="error-box-head">
