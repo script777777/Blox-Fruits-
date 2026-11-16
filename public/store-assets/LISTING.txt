@@ -1,0 +1,56 @@
+=== Chrome Web Store — copy/paste texts (Void Syndicate Bypass) ===
+
+NAME (max ~45 chars):
+Void Syndicate Bypass
+
+SHORT DESCRIPTION (max 132 chars):
+Bypass Linkvertise, Work.ink, Lootlabs and more from any tab — popup, right-click, or floating button.
+
+DETAILED DESCRIPTION:
+Void Syndicate Bypass lets you resolve supported ad-locked and key-system links without leaving the page.
+
+What you can do:
+• Toolbar popup — paste a link and bypass instantly
+• Right-click any link or page — “Bypass with Void Syndicate”
+• Floating button on supported sites (Linkvertise, Work.ink, Lootlabs, and more)
+
+How it works:
+1. Install the extension
+2. Open the popup and save your Void Syndicate API key (vs_…)
+3. Bypass from the popup, context menu, or floating button
+
+Get an API key:
+https://void-syndicate-954.netlify.app (Pricing) or Discord
+
+Privacy policy:
+https://void-syndicate-954.netlify.app/privacy.html
+
+Support:
+Discord https://discord.gg/Rn9Bh7CwAr
+Email contact@voidsyndicate.app
+
+CATEGORY:
+Productivity (or Tools)
+
+LANGUAGE:
+English
+
+======= Permission justifications (if asked) =======
+
+storage:
+Stores your API key and last bypass result locally in the browser.
+
+contextMenus:
+Adds “Bypass with Void Syndicate” to the right-click menu on links, pages, and selected text.
+
+activeTab:
+Used when bypassing the page you are currently viewing.
+
+clipboardWrite:
+Copies the bypassed destination URL when you use Copy / after a successful bypass in the popup.
+
+Host permissions (void-syndicate-954.netlify.app):
+Required to call the Void Syndicate bypass API.
+
+Host permissions (linkvertise, work.ink, lootlabs, …):
+Required so the floating bypass button can run on those sites and read the current page URL you chose to bypass.

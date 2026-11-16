@@ -1227,85 +1227,213 @@ function App() {
                 Right-click any link, use the toolbar popup, or tap the floating Void
                 button on Linkvertise / Work.ink / Lootlabs — result opens instantly.
               </p>
-              <a className="primary-btn" href="/void-syndicate-extension.zip" download>
-                Download extension ZIP ↗
+              <a
+                className="primary-btn"
+                href="/void-syndicate-extension-chrome-store.zip"
+                download
+              >
+                Download Chrome Store ZIP ↗
               </a>
             </div>
 
             <article className="info-card glow">
-              <p className="eyebrow">What you get</p>
-              <ul className="checks-left">
-                <li>Toolbar popup with Paste + Bypass</li>
-                <li>Right-click → “Bypass with Void Syndicate”</li>
-                <li>Floating button on supported adlink sites</li>
-                <li>Uses your Void API key (`vs_…`) securely in the browser</li>
-              </ul>
+              <p className="eyebrow">Which ZIP?</p>
+              <h2>
+                <code>void-syndicate-extension-chrome-store.zip</code>
+              </h2>
+              <p className="lede-left">
+                Das ist die Datei für den Chrome Web Store <strong>und</strong> für „Load
+                unpacked“. Darin liegt <code>manifest.json</code> direkt im ZIP-Root — so
+                will es Google.
+              </p>
+              <div className="chip-row">
+                <a className="chip" href="/void-syndicate-extension-chrome-store.zip" download>
+                  Store ZIP
+                </a>
+                <a className="chip" href="/privacy.html" target="_blank" rel="noreferrer">
+                  Privacy Policy
+                </a>
+                <a className="chip" href="/store-assets/LISTING.txt" target="_blank" rel="noreferrer">
+                  Listing texts
+                </a>
+              </div>
             </article>
 
             <article className="info-card">
-              <p className="eyebrow">Install — Chrome / Edge / Brave</p>
-              <h2>Load unpacked (2 minutes)</h2>
+              <p className="eyebrow">A — Nur lokal testen (ohne Store)</p>
+              <h2>Load unpacked</h2>
               <ol className="numbered-steps">
                 <li>
                   <span>1</span>
                   <p>
-                    Download the ZIP and <strong>unzip</strong> it (you need the folder,
-                    not the ZIP itself).
+                    ZIP herunterladen und <strong>komplett entpacken</strong> (Ordner muss
+                    <code>manifest.json</code> enthalten).
                   </p>
                 </li>
                 <li>
                   <span>2</span>
                   <p>
-                    Open <code>chrome://extensions</code> (or <code>edge://extensions</code>)
-                    and enable <strong>Developer mode</strong>.
+                    Chrome öffnen → Adresszeile: <code>chrome://extensions</code>
                   </p>
                 </li>
                 <li>
                   <span>3</span>
                   <p>
-                    Click <strong>Load unpacked</strong> and select the unzipped{" "}
-                    <code>extension</code> folder.
+                    Oben rechts <strong>Developer mode</strong> einschalten.
                   </p>
                 </li>
                 <li>
                   <span>4</span>
                   <p>
-                    Open the extension popup → paste your <code>vs_…</code> API key →
-                    Save. Get a key on Pricing / Discord if you don’t have one.
+                    <strong>Load unpacked</strong> → den <strong>entpackten Ordner</strong>{" "}
+                    wählen (nicht die ZIP-Datei).
+                  </p>
+                </li>
+                <li>
+                  <span>5</span>
+                  <p>
+                    Extension-Icon anklicken → <code>vs_…</code> Key einfügen.
                   </p>
                 </li>
               </ol>
-              <div className="chip-row">
-                <a className="chip" href="/void-syndicate-extension.zip" download>
-                  Download ZIP
-                </a>
-                <button type="button" className="chip" onClick={goPricing}>
-                  Get API key
-                </button>
-              </div>
             </article>
 
             <article className="info-card">
-              <p className="eyebrow">Firefox</p>
-              <h2>Temporary add-on</h2>
+              <p className="eyebrow">B — Chrome Web Store veröffentlichen</p>
+              <h2>Genaue Schritte (du zahlst $5)</h2>
               <ol className="numbered-steps">
                 <li>
                   <span>1</span>
                   <p>
-                    Open <code>about:debugging#/runtime/this-firefox</code>
+                    Öffne{" "}
+                    <a
+                      href="https://chrome.google.com/webstore/devconsole"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      chrome.google.com/webstore/devconsole
+                    </a>{" "}
+                    und melde dich mit deinem Google-Konto an.
                   </p>
                 </li>
                 <li>
                   <span>2</span>
                   <p>
-                    <strong>Load Temporary Add-on…</strong> → pick{" "}
-                    <code>manifest.json</code> from the unzipped folder.
+                    Einmalig die <strong>$5 Developer Registration</strong> bezahlen (Karte /
+                    Google Pay). Ohne das geht kein Upload.
+                  </p>
+                </li>
+                <li>
+                  <span>3</span>
+                  <p>
+                    Account-Infos ausfüllen (Name, Email, ggf. Trader/Non-trader). Speichern.
+                  </p>
+                </li>
+                <li>
+                  <span>4</span>
+                  <p>
+                    <strong>New item</strong> → Datei wählen:{" "}
+                    <code>void-syndicate-extension-chrome-store.zip</code> (von dieser Seite
+                    downloaden).
+                  </p>
+                </li>
+                <li>
+                  <span>5</span>
+                  <p>
+                    Store listing ausfüllen — Texte copy-pasten aus{" "}
+                    <a href="/store-assets/LISTING.txt" target="_blank" rel="noreferrer">
+                      LISTING.txt
+                    </a>
+                    .
+                  </p>
+                </li>
+                <li>
+                  <span>6</span>
+                  <p>
+                    Screenshots hochladen (mind. 1):{" "}
+                    <a href="/store-assets/screenshot-1280x800.png" download>
+                      1280×800
+                    </a>{" "}
+                    und/oder{" "}
+                    <a href="/store-assets/screenshot-640x400.png" download>
+                      640×400
+                    </a>
+                    . Optional Marquee:{" "}
+                    <a href="/store-assets/marquee-1400x560.png" download>
+                      1400×560
+                    </a>
+                    .
+                  </p>
+                </li>
+                <li>
+                  <span>7</span>
+                  <p>
+                    Privacy policy URL eintragen:{" "}
+                    <code>https://void-syndicate-954.netlify.app/privacy.html</code>
+                  </p>
+                </li>
+                <li>
+                  <span>8</span>
+                  <p>
+                    Category: <strong>Productivity</strong> · Language: <strong>English</strong>
+                  </p>
+                </li>
+                <li>
+                  <span>9</span>
+                  <p>
+                    Distribution: <strong>Public</strong> (oder Unlisted zum Testen).
+                  </p>
+                </li>
+                <li>
+                  <span>10</span>
+                  <p>
+                    Bei Permissions die Begründungen aus LISTING.txt einfügen, falls Google
+                    danach fragt.
+                  </p>
+                </li>
+                <li>
+                  <span>11</span>
+                  <p>
+                    <strong>Submit for review</strong> klicken. Review dauert oft 1–3 Tage
+                    (manchmal länger).
+                  </p>
+                </li>
+                <li>
+                  <span>12</span>
+                  <p>
+                    Nach Freigabe: Store-Link teilen — User installieren mit 1 Klick, kein
+                    Developer mode.
                   </p>
                 </li>
               </ol>
+              <div className="chip-row">
+                <a
+                  className="chip"
+                  href="/void-syndicate-extension-chrome-store.zip"
+                  download
+                >
+                  Store ZIP laden
+                </a>
+                <a
+                  className="chip"
+                  href="https://chrome.google.com/webstore/devconsole"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Dev Console öffnen
+                </a>
+                <button type="button" className="chip" onClick={goPricing}>
+                  API keys
+                </button>
+              </div>
+            </article>
+
+            <article className="info-card soft">
+              <p className="eyebrow">Wichtig</p>
               <p className="lede-left">
-                Chrome Web Store publish comes later (one-time $5 developer fee). Until
-                then, Developer mode install works for you and your Discord members.
+                User bekommen nur die Extension (Client), nicht euren Website-/Server-Code
+                und nicht euren Master-Key. Sie brauchen einen eigenen <code>vs_…</code> Key
+                von euch.
               </p>
             </article>
           </section>

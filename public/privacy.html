@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy — Void Syndicate</title>
+    <meta name="theme-color" content="#b56cff" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07060c;
+        --ink: #faf7ff;
+        --muted: #b3a9c7;
+        --accent: #b56cff;
+        --border: #2e2840;
+        font-family: Geist, Inter, system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: radial-gradient(700px 320px at 50% -10%, rgba(181, 108, 255, 0.16), transparent 55%),
+          var(--bg);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 2.5rem 1.25rem 4rem;
+      }
+      a {
+        color: var(--accent);
+      }
+      h1 {
+        letter-spacing: -0.03em;
+        margin: 0.4rem 0 0.75rem;
+      }
+      h2 {
+        margin-top: 1.75rem;
+        font-size: 1.1rem;
+      }
+      p,
+      li {
+        color: var(--muted);
+      }
+      .eyebrow {
+        color: var(--accent);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      code {
+        background: rgba(181, 108, 255, 0.12);
+        color: var(--accent);
+        padding: 0.1rem 0.35rem;
+        border-radius: 6px;
+        font-size: 0.92em;
+      }
+      .card {
+        margin-top: 1.25rem;
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(18, 16, 24, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Void Syndicate</p>
+      <h1>Privacy Policy</h1>
+      <p>Last updated: November 16, 2026</p>
+
+      <div class="card">
+        <p>
+          This policy covers the <strong>Void Syndicate</strong> website
+          (<a href="https://void-syndicate-954.netlify.app">void-syndicate-954.netlify.app</a>)
+          and the <strong>Void Syndicate Bypass</strong> browser extension.
+        </p>
+      </div>
+
+      <h2>1. What we collect</h2>
+      <ul>
+        <li>
+          <strong>API key (extension / website local storage):</strong> If you save a Void
+          Syndicate API key, it is stored <em>locally in your browser</em> and sent only as
+          the <code>x-api-key</code> header to our API when you request a bypass.
+        </li>
+        <li>
+          <strong>URLs you submit for bypass:</strong> Sent to our servers so we can resolve
+          the destination link. We do not sell this data.
+        </li>
+        <li>
+          <strong>Basic technical logs:</strong> Our host (Netlify) may log standard request
+          metadata (time, status code, IP) for reliability and abuse prevention.
+        </li>
+      </ul>
+
+      <h2>2. What we do not collect</h2>
+      <ul>
+        <li>No account password for the extension</li>
+        <li>No browsing history beyond the URL you explicitly bypass</li>
+        <li>No sale of personal data to advertisers</li>
+      </ul>
+
+      <h2>3. How the extension uses permissions</h2>
+      <ul>
+        <li><code>storage</code> — save your API key and last result locally</li>
+        <li><code>contextMenus</code> — “Bypass with Void Syndicate” on right-click</li>
+        <li><code>activeTab</code> / host access — read the current supported page URL to bypass it</li>
+        <li><code>clipboardWrite</code> — copy the bypassed destination when you ask</li>
+      </ul>
+
+      <h2>4. Third parties</h2>
+      <p>
+        Bypass requests are processed by our API on Netlify. Upstream link-resolution providers
+        may receive the target URL as part of fulfilling the bypass. Payment / key purchases
+        are handled manually via Discord — we do not process card data on the website.
+      </p>
+
+      <h2>5. Contact</h2>
+      <p>
+        Questions: <a href="mailto:contact@voidsyndicate.app">contact@voidsyndicate.app</a>
+        or Discord: <a href="https://discord.gg/Rn9Bh7CwAr">discord.gg/Rn9Bh7CwAr</a>
+      </p>
+
+      <p><a href="/">← Back to Void Syndicate</a></p>
+    </main>
+  </body>
+</html>

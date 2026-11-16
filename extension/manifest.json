@@ -22,7 +22,6 @@
   "permissions": ["storage", "contextMenus", "activeTab", "clipboardWrite"],
   "host_permissions": [
     "https://void-syndicate-954.netlify.app/*",
-    "http://localhost/*",
     "*://linkvertise.com/*",
     "*://*.linkvertise.com/*",
     "*://link-to.net/*",
