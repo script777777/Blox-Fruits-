@@ -35,11 +35,11 @@ const SUPPORTS = [
 const FAQ = [
   {
     q: "Ist Void Syndicate wirklich kostenlos?",
-    a: "Ja. Einzelne Bypass-Anfragen funktionieren ohne Abo. Ein optionaler API-Key schaltet Bulk-Modus frei und überspringt Captchas auf der Original-API.",
+    a: "Ja. Einzelne Bypass-Anfragen auf der Website sind gratis und ohne Captcha. Ein API-Key schaltet Bulk-Modus und die öffentliche API frei.",
   },
   {
     q: "Brauche ich einen API-Key?",
-    a: "Für den normalen Single-Modus nicht zwingend. Mit Key läuft der Bypass ohne Captcha über die API.",
+    a: "Für Single-Bypass auf der Website nein. Der Key ist für Bulk, Bots und eigene Apps über unsere API.",
   },
   {
     q: "Welche Dienste werden unterstützt?",
@@ -690,7 +690,7 @@ function App() {
                   <h3>Paste your link</h3>
                   <p>
                     Drop any Linkvertise, Platoboost, Loot-Link, or supported URL into
-                    the input. Bulk mode available with an API key.
+                    the input. Bulk mode unlocks with an API key.
                   </p>
                 </article>
                 <article>
@@ -698,10 +698,10 @@ function App() {
                     <span className="step-num">02</span>
                     <span>step</span>
                   </div>
-                  <h3>Verify captcha</h3>
+                  <h3>We handle the wait</h3>
                   <p>
-                    Without a key, abuse protection can slow you down. With your API
-                    key Void Syndicate talks to the API directly and skips that step.
+                    No captcha on Void Syndicate. Paste your link and we resolve it
+                    through our API — fast, free, no surveys.
                   </p>
                 </article>
                 <article>
@@ -731,7 +731,7 @@ function App() {
                 </h3>
                 <p>
                   No paywalls, no premium tiers, no rate-limit walls on the free UI.
-                  Connect your API key for captcha-free bypasses.
+                  Grab an API key on Discord for bulk mode and your own apps.
                 </p>
                 <p className="supports-label">Supports</p>
                 <div className="tags">
@@ -1204,8 +1204,9 @@ function App() {
           >
             <h3>API key</h3>
             <p>
-              Optional — stored locally in your browser and sent as{" "}
-              <code>x-api-key</code> for captcha-free bypasses.
+              Optional — unlocks <strong>Bulk</strong> on the site and our public API.
+              Stored locally in your browser and sent as <code>x-api-key</code>.
+              Get a key on Discord (Pricing).
             </p>
             <input
               type="password"
