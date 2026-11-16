@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Use and compare the best AI models for free – chat, images, web search and Agent X, all in one place.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="VAIs">
+  <meta property="og:title" content="VAIs – The best AI models, free">
+  <meta property="og:description" content="Use and compare the best AI models for free – chat, images, web search and Agent X, all in one place.">
+  <meta property="og:url" content="__ORIGIN__/">
+  <meta property="og:image" content="__ORIGIN__/og.jpg?v=2">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="VAIs – the best AI models, free, in one place">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="VAIs – The best AI models, free">
+  <meta name="twitter:description" content="Use and compare the best AI models for free – chat, images, web search and Agent X, all in one place.">
+  <meta name="twitter:image" content="__ORIGIN__/og.jpg?v=2">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>VAIs</title>
+  <script src="/boot.js"></script>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-title" content="VAIs">
+  <link rel="stylesheet" href="/fonts.css">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/vendor/marked.js" defer></script>
+  <script src="/vendor/purify.js" defer></script>
+  <script src="/vendor/hljs.js" defer></script>
+  <script src="/vendor/katex.js" defer></script>
+  <link rel="stylesheet" href="/vendor/katex.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="top-left">
+      <button class="round-btn" id="open-drawer" aria-label="Seitenleiste öffnen" data-en-aria-label="Open sidebar" title="Verlauf" data-en-title="History" aria-controls="drawer" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16M5.5 10l1.5 2-1.5 2"/></svg>
+      </button>
+      <a class="brand" href="/" aria-label="VAIs – Startseite" data-en-aria-label="VAIs – Home">
+        <svg viewBox="184 393 880 435" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M 601 403.679 C 507.649 413.247, 431.660 479.940, 407.509 573.500 C 403.129 590.468, 401.168 604.095, 399.984 625.803 C 398.879 646.045, 397.565 652.283, 392.040 663.500 C 382.018 683.847, 365.505 695.851, 320 715.867 C 303.402 723.168, 207.557 763.832, 197.218 767.959 C 190.771 770.533, 194.820 769.905, 206.564 766.511 C 238.304 757.337, 358.208 722.344, 371 718.521 C 452.693 694.109, 460.118 691.659, 603.500 641.818 C 616.150 637.421, 643.375 628.060, 664 621.016 C 757.864 588.961, 789.903 577.631, 829.500 562.490 C 844.900 556.602, 866.725 548.289, 878 544.018 C 902.765 534.636, 936.160 521.215, 985 501.018 C 1005.075 492.716, 1028.800 482.929, 1037.723 479.268 C 1046.646 475.608, 1053.800 472.467, 1053.622 472.289 C 1053.444 472.110, 1044.568 474.422, 1033.899 477.426 C 1012.098 483.563, 912.214 510.851, 887.184 517.508 C 842.335 529.436, 823.074 524.263, 792.500 492.079 C 754.604 452.188, 737.941 438.542, 709.927 424.459 C 677.462 408.137, 635.536 400.139, 601 403.679 M 594.928 454.459 C 503.328 469.497, 441.822 552.750, 449.882 650.792 C 451.153 666.253, 451.803 668.001, 456.285 667.998 C 458.869 667.997, 494.613 657.721, 495.653 656.680 C 495.809 656.524, 495.064 653.515, 493.998 649.993 C 484.783 619.559, 488.897 584.353, 504.995 555.868 C 547.615 480.460, 651.351 466.212, 709.171 527.824 C 720.371 539.759, 730.734 556.740, 734.516 569.355 C 735.289 571.937, 736.290 573.407, 737.168 573.255 C 740.291 572.711, 771.598 559.775, 772.917 558.483 C 775.772 555.686, 774.506 551.544, 767.540 540.890 C 737.607 495.110, 697.340 465.952, 650.288 455.983 C 637.312 453.234, 607.407 452.411, 594.928 454.459 M 604 497.029 C 549.216 503.491, 504.485 545.814, 495.961 599.253 C 494.094 610.960, 495.235 633.126, 498.306 644.792 C 499.651 649.903, 500.951 654.285, 501.195 654.529 C 501.658 654.991, 503.813 654.306, 559.500 635.974 C 620.617 615.856, 701.339 587.717, 726.250 577.847 C 729.763 576.455, 729.725 575.933, 725.350 565.482 C 706.072 519.428, 655.580 490.946, 604 497.029 M 772.592 618.145 C 772.358 618.890, 771.932 623.325, 771.646 628 C 766.744 707.941, 691.333 773.635, 609.063 769.635 C 568.394 767.657, 535 752.853, 505.596 723.765 C 498.499 716.744, 492.370 711, 491.975 711 C 488.074 711, 465.852 728.689, 462.442 734.509 C 458.206 741.737, 460.068 746.560, 471.742 758.598 C 517.698 805.987, 590.919 827.838, 657.512 814.034 C 738.114 797.327, 803.810 729.586, 816.021 650.590 C 820.417 622.152, 816.932 617.881, 788.759 617.181 C 776.136 616.868, 772.933 617.059, 772.592 618.145 M 733.352 621.997 C 731.608 622.698, 730.984 624.235, 730.033 630.180 C 722.649 676.347, 688.451 713.286, 641.500 725.810 C 626.694 729.760, 598.446 729.697, 583.500 725.681 C 565.734 720.908, 545.777 709.915, 532 697.312 C 527.222 692.942, 526.205 692.414, 524.250 693.293 C 520.989 694.760, 521.243 695.202, 529.487 702.392 C 548.367 718.858, 566.836 728.076, 590.685 732.936 C 654.809 746.003, 719.954 703.744, 734.809 639.444 C 738.415 623.832, 738.103 620.088, 733.352 621.997"/></svg>
+        <span>VAIs</span>
+      </a>
+      </div>
+      <p class="chat-title" id="chat-title"></p>
+      <div class="top-actions">
+        <button class="round-btn" id="share-chat" aria-label="Chat teilen" data-en-aria-label="Share chat" title="Teilen" data-en-title="Share" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>
+        </button>
+        <button class="round-btn incognito-btn" id="incognito-btn" aria-pressed="false" aria-label="Inkognito-Chat" data-en-aria-label="Incognito chat" title="Inkognito: wird nicht gespeichert" data-en-title="Incognito: not saved">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18M5 11l2-6h10l2 6"/><circle cx="7" cy="16" r="3"/><circle cx="17" cy="16" r="3"/><path d="M10 16h4"/></svg>
+        </button>
+        <button class="round-btn" id="new-chat" aria-label="Neuer Chat" data-en-aria-label="New chat" title="Neuer Chat" data-en-title="New chat" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v8M8 12h8"/><path d="M21 12a9 9 0 0 1-13.5 7.8L3 21l1.2-4.5A9 9 0 1 1 21 12Z"/></svg>
+        </button>
+        <div class="account">
+          <button class="avatar" id="avatar" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu"></button>
+          <div class="menu" id="account-menu" hidden>
+            <p class="menu-email" id="menu-email"></p>
+            <button class="menu-item" id="open-settings">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+              <span data-en="Settings">Einstellungen</span>
+            </button>
+            <button class="btn" id="logout">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></svg>
+              <span data-en="Sign out">Abmelden</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+    <p class="offline-banner maint-banner" id="maint-banner" role="status" hidden><span aria-hidden="true">🛠️</span><span id="maint-text"></span></p>
+    <p class="offline-banner" id="offline-banner" role="status" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M9.8 5.2A15 15 0 0 1 22 8.8M5 12.5a10 10 0 0 1 3.5-2.1M15.4 10.6A10 10 0 0 1 19 12.5M8.5 16a5 5 0 0 1 7 0M12 20h.01M3 3l18 18"/></svg>
+      <span data-en="Offline – new messages are sent when you are back online">Offline – neue Nachrichten werden gesendet, sobald du wieder online bist</span>
+    </p>
+
+    <p class="incognito-banner" id="incognito-banner" hidden><span aria-hidden="true">🕶️</span> <span data-en="Incognito – this chat will not be saved and disappears when you leave it.">Inkognito – dieser Chat wird nicht gespeichert und verschwindet, wenn du ihn verlässt.</span></p>
+    <div class="home-stars" aria-hidden="true"></div>
+    <main class="stage" id="stage">
+      <section class="home" id="home">
+        <h1 class="home-title" data-en="What would you like to do?">Was möchtest du tun?</h1>
+        <p class="demo-note" id="demo-note" hidden data-en="Demo mode: placeholder models answer until an API key is configured.">Demo-Modus: Es antworten Platzhalter-Modelle, bis ein API-Schlüssel eingetragen ist.</p>
+      </section>
+      <section class="thread" id="thread" aria-live="polite" hidden></section>
+      <section class="board stats" id="stats" hidden>
+        <div class="board-inner">
+          <h1 class="board-title" data-en="My stats">Meine Statistik</h1>
+          <p class="board-sub" id="stats-sub"></p>
+          <div class="usage-card" id="usage-card" hidden></div>
+          <div class="stat-grid" id="stat-grid"></div>
+          <h2 class="stat-h" data-en="How you use VAIs">So nutzt du VAIs</h2>
+          <div class="stat-modes" id="stat-modes"></div>
+          <h2 class="stat-h" data-en="Your battle winners">Deine Battle-Sieger</h2>
+          <ol class="board-list" id="stat-fav"></ol>
+          <h2 class="stat-h" data-en="Most used models">Meistgenutzte Modelle</h2>
+          <ol class="board-list" id="stat-used"></ol>
+        </div>
+      </section>
+      <section class="board konto" id="konto" hidden>
+        <div class="board-inner">
+          <h1 class="board-title" data-en="Account balance">Kontostand</h1>
+          <p class="board-sub" data-en="Enter what comes in and goes out. Agent X can read it and add entries for you.">Trag ein, was reinkommt und rausgeht. Agent X kann es lesen und auf Wunsch für dich eintragen.</p>
+          <div class="konto-balance"><small data-en="Current balance">Aktueller Kontostand</small><b id="konto-balance">–</b></div>
+          <form class="konto-form" id="konto-form" autocomplete="off">
+            <input class="input" id="konto-amount" inputmode="decimal" placeholder="Betrag, z. B. 12,50" data-en-placeholder="Amount, e.g. 12.50" aria-label="Betrag" data-en-aria-label="Amount">
+            <input class="input" id="konto-note" maxlength="120" placeholder="Wofür? (z. B. Taschengeld)" data-en-placeholder="What for? (e.g. pocket money)" aria-label="Wofür" data-en-aria-label="What for">
+            <input class="input" id="konto-day" type="date" aria-label="Datum" data-en-aria-label="Date">
+            <div class="konto-btns">
+              <button type="button" class="btn konto-plus" data-sign="1" data-en="+ Income">+ Einnahme</button>
+              <button type="button" class="btn konto-minus" data-sign="-1" data-en="− Expense">− Ausgabe</button>
+            </div>
+          </form>
+          <details class="konto-set">
+            <summary data-en="Set balance">Kontostand eintragen</summary>
+            <div class="konto-set-row">
+              <input class="input" id="konto-set-value" inputmode="decimal" placeholder="Aktueller Stand, z. B. 250,00" data-en-placeholder="Current balance, e.g. 250.00" aria-label="Kontostand" data-en-aria-label="Balance">
+              <button type="button" class="btn" id="konto-set-btn" data-en="Apply">Übernehmen</button>
+            </div>
+          </details>
+          <h2 class="stat-h" data-en="History">Verlauf</h2>
+          <div class="konto-chart" id="konto-chart"></div>
+          <h2 class="stat-h" data-en="Income &amp; expenses per month">Einnahmen &amp; Ausgaben pro Monat</h2>
+          <div class="konto-chart" id="konto-months"></div>
+          <h2 class="stat-h" data-en="Entries">Buchungen</h2>
+          <div class="table-wrap"><table class="konto-table">
+            <thead><tr><th data-en="Date">Datum</th><th data-en="What for">Wofür</th><th data-en="Amount">Betrag</th><th data-en="Balance">Stand</th><th></th></tr></thead>
+            <tbody id="konto-rows"></tbody>
+          </table></div>
+        </div>
+      </section>
+      <section class="board" id="board" hidden>
+        <div class="board-inner">
+          <h1 class="board-title" data-en="Leaderboard">Bestenliste</h1>
+          <p class="board-sub" id="board-sub"></p>
+          <div class="board-tabs" role="tablist" aria-label="Kategorie" data-en-aria-label="Category">
+            <button type="button" role="tab" data-board="all" data-en="All">Alle</button>
+            <button type="button" role="tab" data-board="text" data-en="Text">Text</button>
+            <button type="button" role="tab" data-board="code" data-en="Code">Code</button>
+            <button type="button" role="tab" data-board="web" data-en="Web search">Websuche</button>
+            <button type="button" role="tab" data-board="image" data-en="Image">Bild</button>
+          </div>
+          <ol class="board-list" id="board-list"></ol>
+        </div>
+      </section>
+    </main>
+
+    <div class="dock">
+      <div class="dock-inner">
+        <div class="mode-menu" id="mode-menu" role="menu" hidden></div>
+        <div class="mode-menu" id="modality-menu" role="menu" hidden></div>
+        <section class="suggest" id="suggest" aria-label="Vorschläge" data-en-aria-label="Suggestions">
+          <p class="suggest-label" data-en="Get started">Los geht's</p>
+          <div class="suggest-track" id="suggest-track"></div>
+        </section>
+        <form class="composer" id="composer">
+          <div class="vote" id="vote" hidden>
+            <button type="button" data-vote="a" data-en="A is better">A ist besser</button>
+            <button type="button" data-vote="tie" class="vote-icon" aria-label="Unentschieden" data-en-aria-label="Tie" title="Unentschieden" data-en-title="Tie">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>
+            </button>
+            <button type="button" data-vote="bad" class="vote-icon" aria-label="Beide schlecht" data-en-aria-label="Both are bad" title="Beide schlecht" data-en-title="Both are bad">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m5.6 18.4 12.8-12.8"/></svg>
+            </button>
+            <button type="button" data-vote="b" data-en="B is better">B ist besser</button>
+          </div>
+          <div class="vote-result" id="vote-result" hidden></div>
+          <div class="tray" id="tray" hidden></div>
+          <label class="sr-only" for="prompt" data-en="Message">Nachricht</label>
+          <div class="prompt-wrap">
+            <textarea id="prompt" rows="1" placeholder="Frag irgendwas …" enterkeyhint="send"></textarea>
+            <button type="button" class="improve-btn" id="improve-btn" hidden aria-label="Nachricht verbessern" data-en-aria-label="Improve message" title="Nachricht verbessern" data-en-title="Improve message">✨</button>
+          </div>
+          <div class="composer-bar">
+            <div class="controls">
+              <button type="button" class="ctrl" id="attach-btn" aria-label="Bild oder Datei anhängen" data-en-aria-label="Attach image or file" title="Bild oder Datei anhängen" data-en-title="Attach image or file">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+              <input type="file" id="attach-input" multiple hidden
+                accept="image/*,.pdf,application/pdf,.txt,.md,.csv,.json,.js,.mjs,.ts,.tsx,.jsx,.py,.html,.htm,.css,.xml,.yml,.yaml,.java,.c,.h,.cpp,.cs,.go,.rs,.php,.rb,.sql,.lua,.sh,.log,.ini,.toml">
+              <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+              <div class="attach-menu" id="attach-menu" hidden role="menu">
+                <button type="button" role="menuitem" data-attach="camera"><span aria-hidden="true">📷</span><span data-en="Take photo">Foto aufnehmen</span></button>
+                <button type="button" role="menuitem" data-attach="file"><span aria-hidden="true">📎</span><span data-en="Image or file">Bild oder Datei</span></button>
+              </div>
+              <button type="button" class="ctrl" id="mode-btn" aria-haspopup="true" aria-expanded="false" aria-controls="mode-menu"></button>
+              <button type="button" class="ctrl" id="modality-btn" aria-haspopup="true" aria-expanded="false" aria-controls="modality-menu"></button>
+            </div>
+            <div class="send-area">
+              <button type="button" class="ctrl model-chip" data-slot="0" hidden></button>
+              <button type="button" class="ctrl model-chip" data-slot="1" hidden></button>
+              <button type="button" class="mic" id="mic" aria-label="Sprechen" data-en-aria-label="Speak" title="Sprechen" data-en-title="Speak" aria-pressed="false" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+              </button>
+              <button type="button" class="mic voice-btn" id="voice-btn" aria-label="Sprach-Modus" data-en-aria-label="Voice mode" title="Sprach-Modus" data-en-title="Voice mode" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
+              </button>
+              <button type="button" class="send stop stop-extra" id="stop-btn" aria-label="Stoppen" data-en-aria-label="Stop" title="Stoppen" data-en-title="Stop" hidden></button>
+              <button class="send" id="send" type="submit" aria-label="Senden"></button>
+            </div>
+          </div>
+        </form>
+        <div class="mode-pills" id="mode-pills" role="group" aria-label="Schnellwahl" data-en-aria-label="Quick select"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Seitenleiste mit Verlauf -->
+  <div class="drawer" id="drawer" hidden>
+    <div class="drawer-backdrop" data-close-drawer></div>
+    <nav class="drawer-panel" aria-label="Seitenleiste" data-en-aria-label="Sidebar">
+      <div class="drawer-head">
+        <span class="brand"><svg viewBox="184 393 880 435" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M 601 403.679 C 507.649 413.247, 431.660 479.940, 407.509 573.500 C 403.129 590.468, 401.168 604.095, 399.984 625.803 C 398.879 646.045, 397.565 652.283, 392.040 663.500 C 382.018 683.847, 365.505 695.851, 320 715.867 C 303.402 723.168, 207.557 763.832, 197.218 767.959 C 190.771 770.533, 194.820 769.905, 206.564 766.511 C 238.304 757.337, 358.208 722.344, 371 718.521 C 452.693 694.109, 460.118 691.659, 603.500 641.818 C 616.150 637.421, 643.375 628.060, 664 621.016 C 757.864 588.961, 789.903 577.631, 829.500 562.490 C 844.900 556.602, 866.725 548.289, 878 544.018 C 902.765 534.636, 936.160 521.215, 985 501.018 C 1005.075 492.716, 1028.800 482.929, 1037.723 479.268 C 1046.646 475.608, 1053.800 472.467, 1053.622 472.289 C 1053.444 472.110, 1044.568 474.422, 1033.899 477.426 C 1012.098 483.563, 912.214 510.851, 887.184 517.508 C 842.335 529.436, 823.074 524.263, 792.500 492.079 C 754.604 452.188, 737.941 438.542, 709.927 424.459 C 677.462 408.137, 635.536 400.139, 601 403.679 M 594.928 454.459 C 503.328 469.497, 441.822 552.750, 449.882 650.792 C 451.153 666.253, 451.803 668.001, 456.285 667.998 C 458.869 667.997, 494.613 657.721, 495.653 656.680 C 495.809 656.524, 495.064 653.515, 493.998 649.993 C 484.783 619.559, 488.897 584.353, 504.995 555.868 C 547.615 480.460, 651.351 466.212, 709.171 527.824 C 720.371 539.759, 730.734 556.740, 734.516 569.355 C 735.289 571.937, 736.290 573.407, 737.168 573.255 C 740.291 572.711, 771.598 559.775, 772.917 558.483 C 775.772 555.686, 774.506 551.544, 767.540 540.890 C 737.607 495.110, 697.340 465.952, 650.288 455.983 C 637.312 453.234, 607.407 452.411, 594.928 454.459 M 604 497.029 C 549.216 503.491, 504.485 545.814, 495.961 599.253 C 494.094 610.960, 495.235 633.126, 498.306 644.792 C 499.651 649.903, 500.951 654.285, 501.195 654.529 C 501.658 654.991, 503.813 654.306, 559.500 635.974 C 620.617 615.856, 701.339 587.717, 726.250 577.847 C 729.763 576.455, 729.725 575.933, 725.350 565.482 C 706.072 519.428, 655.580 490.946, 604 497.029 M 772.592 618.145 C 772.358 618.890, 771.932 623.325, 771.646 628 C 766.744 707.941, 691.333 773.635, 609.063 769.635 C 568.394 767.657, 535 752.853, 505.596 723.765 C 498.499 716.744, 492.370 711, 491.975 711 C 488.074 711, 465.852 728.689, 462.442 734.509 C 458.206 741.737, 460.068 746.560, 471.742 758.598 C 517.698 805.987, 590.919 827.838, 657.512 814.034 C 738.114 797.327, 803.810 729.586, 816.021 650.590 C 820.417 622.152, 816.932 617.881, 788.759 617.181 C 776.136 616.868, 772.933 617.059, 772.592 618.145 M 733.352 621.997 C 731.608 622.698, 730.984 624.235, 730.033 630.180 C 722.649 676.347, 688.451 713.286, 641.500 725.810 C 626.694 729.760, 598.446 729.697, 583.500 725.681 C 565.734 720.908, 545.777 709.915, 532 697.312 C 527.222 692.942, 526.205 692.414, 524.250 693.293 C 520.989 694.760, 521.243 695.202, 529.487 702.392 C 548.367 718.858, 566.836 728.076, 590.685 732.936 C 654.809 746.003, 719.954 703.744, 734.809 639.444 C 738.415 623.832, 738.103 620.088, 733.352 621.997"/></svg><span>VAIs</span></span>
+        <button class="round-btn" data-close-drawer aria-label="Seitenleiste schließen" data-en-aria-label="Close sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16M18.5 10 17 12l1.5 2"/></svg>
+        </button>
+      </div>
+      <button class="drawer-item" id="d-new">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v8M8 12h8"/><path d="M21 12a9 9 0 0 1-13.5 7.8L3 21l1.2-4.5A9 9 0 1 1 21 12Z"/></svg>
+        <span data-en="New chat">Neuer Chat</span>
+      </button>
+      <button class="drawer-item" id="d-translate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h8M8 3v2M10 5c0 4-2.5 7-6 8.5M6 9c1 2 3 3.5 5.5 4.5"/><path d="m13 21 4-9 4 9M14.5 18h5"/></svg>
+        <span data-en="Translator">Übersetzer</span>
+      </button>
+      <button class="drawer-item" id="d-konto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a1 1 0 0 1 1 1v2"/><rect x="3" y="7.5" width="18" height="12" rx="2.5"/><path d="M16 13.5h2"/></svg>
+        <span data-en="Account balance">Kontostand</span>
+      </button>
+      <button class="drawer-item" id="d-stats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/></svg>
+        <span data-en="My stats">Meine Statistik</span>
+      </button>
+      <button class="drawer-item" id="d-board">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="9" width="4" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg>
+        <span data-en="Leaderboard">Bestenliste</span>
+      </button>
+      <button class="drawer-item" id="d-team" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3 3-5 6-5s5.4 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c2.5 0 4.4 1.6 5 4"/></svg>
+        <span data-en="Team chat">Team-Chat</span><i class="team-unread" data-team-unread hidden></i>
+      </button>
+      <label class="drawer-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span class="sr-only" data-en="Search chats">Chats suchen</span>
+        <input id="d-search" type="search" placeholder="Chats suchen" data-en-placeholder="Search chats" autocomplete="off">
+      </label>
+      <div class="drawer-list" id="d-list"></div>
+      <button class="drawer-foot" id="d-settings" title="Einstellungen" data-en-title="Settings">
+        <span class="avatar small" id="d-avatar"></span><span id="d-email"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Modellauswahl (Bottom-Sheet) -->
+  <div class="sheet" id="model-sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="Modell wählen" data-en-aria-label="Choose model">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <label class="sr-only" for="model-search" data-en="Search models">Modelle suchen</label>
+      <input class="input" id="model-search" type="search" placeholder="Modelle suchen" data-en-placeholder="Search models" autocomplete="off">
+      <div class="cap-tabs" role="tablist" aria-label="Kategorie" data-en-aria-label="Category">
+        <button type="button" class="cap-tab" role="tab" data-cap="text" aria-label="Text" title="Text">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5 5h14M12 5v15M9 20h6"/></svg>
+        </button>
+        <button type="button" class="cap-tab" role="tab" data-cap="code" aria-label="Code" title="Code">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>
+        </button>
+        <button type="button" class="cap-tab" role="tab" data-cap="image" aria-label="Bild" data-en-aria-label="Image" title="Bild" data-en-title="Image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><circle cx="15.5" cy="8.5" r="1.8"/><path d="m3.5 17 5-5 5 5 2-2 5 5"/></svg>
+        </button>
+        <button type="button" class="cap-tab" role="tab" data-cap="web" aria-label="Websuche" data-en-aria-label="Web search" title="Websuche" data-en-title="Web search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg>
+        </button>
+      </div>
+      <ul class="model-list" id="model-list"></ul>
+    </div>
+  </div>
+
+  <!-- Antwort im Vollbild -->
+  <div class="modal" id="expand" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="expand-title">
+      <div class="modal-head">
+        <span class="card-label" id="expand-title"></span>
+        <button class="card-btn" data-close aria-label="Schließen" data-en-aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body md" id="expand-body"></div>
+    </div>
+  </div>
+
+  <!-- Webseiten-Vorschau (Bottom-Sheet) -->
+  <div class="psheet" id="preview" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="psheet-panel" role="dialog" aria-modal="true" aria-label="Webseite" data-en-aria-label="Website">
+      <div class="sheet-grip" data-close aria-hidden="true"></div>
+      <div class="ptools">
+        <div class="pseg" role="tablist" aria-label="Ansicht" data-en-aria-label="View">
+          <button type="button" role="tab" data-ptab="view" aria-label="Vorschau" data-en-aria-label="Preview" title="Vorschau" data-en-title="Preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button type="button" role="tab" data-ptab="code" aria-label="Code" title="Code">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>
+          </button>
+        </div>
+        <div class="paddr">
+          <button type="button" id="preview-reload" aria-label="Neu laden" data-en-aria-label="Reload" title="Neu laden" data-en-title="Reload">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+          </button>
+          <span>/</span>
+        </div>
+        <button type="button" class="pbtn" id="preview-publish" aria-label="Veröffentlichen" data-en-aria-label="Publish" title="Mit eigenem Link veröffentlichen" data-en-title="Publish with its own link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
+        </button>
+        <button type="button" class="pbtn" id="preview-download" aria-label="Herunterladen" data-en-aria-label="Download" title="Als HTML-Datei herunterladen" data-en-title="Download as HTML file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        </button>
+        <button type="button" class="pbtn ghost" data-close aria-label="Schließen" data-en-aria-label="Close" title="Schließen" data-en-title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="pbody">
+        <iframe id="preview-frame" title="Vorschau der Webseite" data-en-title="Website preview" sandbox="allow-scripts allow-forms allow-modals allow-popups"></iframe>
+        <div class="pbuild" id="preview-build">
+          <span class="bricks live"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <b id="preview-build-title"></b>
+          <small id="preview-build-text"></small>
+        </div>
+        <div class="pcode" id="preview-code">
+          <div class="pfile"><span>index.html</span></div>
+          <pre><code></code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat teilen -->
+  <div class="sheet small-sheet" id="share-sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="share-title">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="settings-head">
+        <h2 id="share-title" data-en="Share chat">Chat teilen</h2>
+        <button class="card-btn" data-close aria-label="Schließen" data-en-aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="set-hint" id="share-text"></p>
+      <div class="share-link" id="share-link-box" hidden>
+        <input class="input" id="share-link" readonly aria-label="Link">
+        <button type="button" class="btn" id="share-copy" data-en="Copy link">Link kopieren</button>
+      </div>
+      <figure class="qr" id="share-qr" hidden><img alt="QR-Code"><figcaption data-en="Scan to open">Zum Öffnen scannen</figcaption></figure>
+      <button type="button" class="btn" id="share-create" data-en="Create link">Link erstellen</button>
+      <button type="button" class="btn ghost-btn" id="share-native" hidden data-en="Share …">Teilen …</button>
+      <button type="button" class="link danger-link" id="share-stop" hidden data-en="Stop sharing">Teilen beenden</button>
+    </div>
+  </div>
+
+  <div class="sheet small-sheet" id="site-sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="site-title">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="settings-head">
+        <h2 id="site-title" data-en="Your website is online 🎉">Deine Webseite ist online 🎉</h2>
+        <button class="card-btn" data-close aria-label="Schließen" data-en-aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="set-hint" data-en="Anyone with this link can open the website – no account needed. If you publish again, the link stays the same.">Jeder mit diesem Link kann die Webseite öffnen – ohne Konto. Veröffentlichst du sie nochmal, bleibt der Link gleich.</p>
+      <div class="share-link">
+        <input class="input" id="site-link" readonly aria-label="Link">
+        <button type="button" class="btn" id="site-copy" data-en="Copy link">Link kopieren</button>
+      </div>
+      <figure class="qr" id="site-qr" hidden><img alt="QR-Code"><figcaption data-en="Scan to open">Zum Öffnen scannen</figcaption></figure>
+      <a class="btn ghost-btn site-open" id="site-open" target="_blank" rel="noopener" data-en="Open website">Webseite öffnen</a>
+      <button type="button" class="btn ghost-btn" id="site-native" hidden data-en="Share …">Teilen …</button>
+      <button type="button" class="link danger-link" id="site-stop" data-en="Take offline">Offline nehmen</button>
+    </div>
+  </div>
+
+  <div class="sheet small-sheet" id="limit-sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="limit-title">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="settings-head">
+        <h2 id="limit-title" data-en="Chat limit reached">Chat-Limit erreicht</h2>
+        <button class="card-btn" data-close aria-label="Schließen" data-en-aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <p class="set-hint" id="limit-text"></p>
+      <button type="button" class="btn" id="limit-oldest" data-en="Delete oldest and continue">Ältesten löschen und weiter</button>
+      <ul class="mem-list limit-list" id="limit-list"></ul>
+    </div>
+  </div>
+
+  <div class="sheet small-sheet" id="news-sheet" hidden>
+    <div class="sheet-backdrop"></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="news-title">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <h2 class="ann-title" id="news-title" data-en="What’s new 🆕">Was ist neu? 🆕</h2>
+      <ol class="news-list" id="news-list"></ol>
+      <button type="button" class="btn" id="news-ok" data-en="Great!">Super!</button>
+    </div>
+  </div>
+
+  <div class="sheet small-sheet" id="ann-sheet" hidden>
+    <div class="sheet-backdrop"></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="ann-title">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <p class="ann-kicker"><span aria-hidden="true">📢</span> <span data-en="Message from VAIs">Mitteilung von VAIs</span> · <span id="ann-date"></span></p>
+      <h2 class="ann-title" id="ann-title"></h2>
+      <p class="ann-body" id="ann-body"></p>
+      <button type="button" class="btn" id="ann-ok" data-en="Got it">Verstanden</button>
+    </div>
+  </div>
+
+  <!-- Einstellungen -->
+  <div class="sheet settings" id="settings" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="settings-head">
+        <h2 id="settings-title" data-en="Settings">Einstellungen</h2>
+        <button class="card-btn" data-close aria-label="Schließen" data-en-aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="settings-body">
+        <section class="set-group">
+          <h3 data-en="Appearance">Darstellung</h3>
+          <div class="seg" role="radiogroup" aria-label="Design" data-en-aria-label="Theme" id="set-theme">
+            <button type="button" role="radio" data-theme-opt="system" data-en="System">System</button>
+            <button type="button" role="radio" data-theme-opt="light" data-en="Light">Hell</button>
+            <button type="button" role="radio" data-theme-opt="dark" data-en="Dark">Dunkel</button>
+          </div>
+          <label class="set-switch">
+            <span><b data-en="Haptic feedback">Vibration (Haptik)</b><small data-en="A short tap feel when sending, when an answer is ready and on errors. iPhone: from iOS 18.">Kurzes Tippen beim Senden, wenn eine Antwort fertig ist und bei Fehlern. iPhone: ab iOS 18.</small></span>
+            <input type="checkbox" id="set-haptics" role="switch">
+          </label>
+          <label class="set-switch">
+            <span><b data-en="Living logo">Lebendiges Logo</b><small data-en="The black hole breathes, spins while the AI is thinking and swallows your message when you send.">Das Schwarze Loch atmet, dreht sich, während die KI denkt, und schluckt deine Nachricht beim Senden.</small></span>
+            <input type="checkbox" id="set-fxlogo" role="switch">
+          </label>
+          <label class="set-switch">
+            <span><b data-en="Sky by time of day">Himmel nach Tageszeit</b><small data-en="A subtle glow in the background – warm in the morning, blue during the day, sunset in the evening, stars at night.">Ein dezentes Leuchten im Hintergrund – morgens warm, tagsüber blau, abends Sonnenuntergang, nachts Sterne.</small></span>
+            <input type="checkbox" id="set-sky" role="switch">
+          </label>
+          <label class="set-switch">
+            <span><b data-en="3D cards (beta)">3D-Karten (Beta)</b><small data-en="Answers tilt slightly when you move your phone.">Antworten kippen leicht, wenn du dein Handy bewegst.</small></span>
+            <input type="checkbox" id="set-tilt" role="switch">
+          </label>
+          <label class="set-row"><span data-en="Photos before sending">Fotos vor dem Senden</span><select class="input set-select" id="set-imgq">
+            <option value="saver" data-en="Save data (small)">Daten sparen (klein)</option>
+            <option value="normal" data-en="Normal">Normal</option>
+            <option value="best" data-en="Best quality">Beste Qualität</option>
+          </select></label>
+          <label class="set-switch">
+            <span><b data-en="Swipe gestures">Wischgesten</b><small data-en="In a chat: swipe right opens the menu, swipe left starts a new chat.">Im Chat: nach rechts wischen öffnet das Menü, nach links wischen startet einen neuen Chat.</small></span>
+            <input type="checkbox" id="set-swipe" role="switch">
+          </label>
+        </section>
+
+        <section class="set-group">
+          <h3 data-en="Language">Sprache</h3>
+          <select class="input set-lang-select" id="set-lang-select" aria-label="Sprache" data-en-aria-label="Language"></select>
+          <p class="set-hint" id="set-lang-hint" hidden data-en="Türkçe, Español, Français and Українська are translated automatically by VAIs – a few texts may still be in English.">Türkçe, Español, Français und Українська übersetzt VAIs automatisch – einzelne Texte können noch englisch sein.</p>
+        </section>
+
+        <section class="set-group">
+          <h3 data-en="Personalization">Persönlich</h3>
+          <form id="set-instr-form" class="set-form" novalidate>
+            <label class="set-label" for="set-instr" data-en="How should the AI answer you?">Wie soll die KI dir antworten?</label>
+            <textarea class="input set-instr" id="set-instr" rows="4" maxlength="1500" placeholder="z. B. Antworte kurz und locker, duz mich und erklär Fachwörter." data-en-placeholder="e.g. Answer briefly and casually and explain technical terms."></textarea>
+            <p class="set-hint set-count" id="set-instr-count">0 / 1500</p>
+            <p class="msg" role="status"></p>
+            <button class="btn" type="submit" data-en="Save">Speichern</button>
+          </form>
+          <label class="set-switch">
+            <span><b data-en="Agent X memory">Gedächtnis von Agent X</b><small data-en="Agent X remembers things about you (e.g. your name or hobbies) for later chats.">Agent X merkt sich Dinge über dich (z. B. Name, Hobbys) für spätere Chats.</small></span>
+            <input type="checkbox" id="set-memory-on" role="switch">
+          </label>
+          <ul class="mem-list" id="set-memories"></ul>
+          <label class="set-switch">
+            <span><b data-en="Agent X: plan first">Agent X: erst ein Plan</b><small data-en="For big tasks Agent X first shows a short plan that you confirm or change.">Bei großen Aufgaben zeigt Agent X zuerst einen kurzen Plan, den du bestätigst oder änderst.</small></span>
+            <input type="checkbox" id="set-plan-on" role="switch" checked>
+          </label>
+          <button type="button" class="btn ghost-btn" id="set-memory-clear" hidden data-en="Forget everything">Alles vergessen</button>
+        </section>
+
+        <section class="set-group" id="set-push-group">
+          <h3 data-en="Reminders">Erinnerungen</h3>
+          <p class="set-hint" id="set-push-text" data-en="Tell Agent X “Remind me tomorrow at 8 about maths” – the reminder arrives as a notification.">Sag Agent X z. B. „Erinnere mich morgen um 8 an Mathe“ – die Erinnerung kommt als Benachrichtigung.</p>
+          <button type="button" class="btn" id="set-push-on" data-en="Allow notifications">Benachrichtigungen erlauben</button>
+          <button type="button" class="btn ghost-btn" id="set-push-test" hidden data-en="Send test notification">Test-Benachrichtigung senden</button>
+          <ul class="mem-list" id="set-reminders"></ul>
+        </section>
+
+        <section class="set-group" id="set-sites-group" hidden>
+          <h3 data-en="My websites">Meine Webseiten</h3>
+          <ul class="mem-list site-list" id="set-sites"></ul>
+        </section>
+
+        <section class="set-group" id="set-voice-group">
+          <h3 data-en="Read aloud">Vorlesen</h3>
+          <label class="set-row"><span data-en="Voice">Stimme</span><select class="input set-select" id="set-voice-engine">
+            <option value="online" data-en="Natural (online)">Natürlich (online)</option>
+            <option value="device" data-en="Device voice">Stimme des Geräts</option>
+          </select></label>
+          <label class="set-row"><span data-en="Online voice">Online-Stimme</span><select class="input set-select" id="set-voice-online">
+            <option value="nova">Nova</option><option value="shimmer">Shimmer</option><option value="alloy">Alloy</option>
+            <option value="echo">Echo</option><option value="fable">Fable</option><option value="onyx">Onyx</option>
+          </select></label>
+          <label class="set-row"><span data-en="German voice">Deutsche Stimme</span><select class="input set-select" id="set-voice-de"></select></label>
+          <label class="set-row"><span data-en="English voice">Englische Stimme</span><select class="input set-select" id="set-voice-en"></select></label>
+          <label class="set-row"><span data-en="Speed">Tempo</span><span class="set-range"><input type="range" id="set-voice-rate" min="0.6" max="1.8" step="0.1" value="1"><output id="set-voice-rate-val">1.0×</output></span></label>
+          <label class="set-row"><span data-en="Pitch">Tonhöhe</span><span class="set-range"><input type="range" id="set-voice-pitch" min="0.6" max="1.6" step="0.1" value="1"><output id="set-voice-pitch-val">1.0</output></span></label>
+          <button type="button" class="btn ghost-btn" id="set-voice-test" data-en="▶ Test voice">▶ Stimme testen</button>
+          <p class="set-hint" data-en="Voices come from your device. ☁ = online voice (often sounds more natural).">Die Stimmen kommen von deinem Gerät. ☁ = Online-Stimme (klingt oft natürlicher).</p>
+        </section>
+
+        <section class="set-group" id="set-install-group" hidden>
+          <h3 data-en="App">App</h3>
+          <p class="set-hint" id="set-install-text"></p>
+          <button type="button" class="btn" id="set-install" hidden data-en="Install VAIs">VAIs installieren</button>
+        </section>
+
+        <section class="set-group" id="set-devices-group">
+          <h3 data-en="Signed-in devices">Angemeldete Geräte</h3>
+          <p class="set-hint" data-en="If you see a device you don’t know, sign it out and change your password. On a new sign-in your other devices get a notification.">Siehst du ein Gerät, das du nicht kennst, melde es ab und ändere dein Passwort. Bei einer neuen Anmeldung bekommen deine anderen Geräte eine Benachrichtigung.</p>
+          <ul class="mem-list dev-list" id="set-devices"></ul>
+          <button type="button" class="btn ghost-btn" id="set-devices-out" hidden data-en="Sign out all other devices">Alle anderen Geräte abmelden</button>
+        </section>
+
+        <section class="set-group">
+          <h3 data-en="Account">Konto</h3>
+          <p class="set-hint" id="set-email"></p>
+          <form id="set-password" class="set-form" novalidate>
+            <input type="email" autocomplete="username" id="set-username" hidden>
+            <label class="sr-only" for="set-current" data-en="Current password">Aktuelles Passwort</label>
+            <input class="input" id="set-current" type="password" autocomplete="current-password" placeholder="Aktuelles Passwort" data-en-placeholder="Current password">
+            <label class="sr-only" for="set-new" data-en="New password">Neues Passwort</label>
+            <input class="input" id="set-new" type="password" autocomplete="new-password" minlength="8" placeholder="Neues Passwort (mind. 8 Zeichen)" data-en-placeholder="New password (min. 8 characters)">
+            <p class="msg" role="status"></p>
+            <button class="btn" type="submit" data-en="Change password">Passwort ändern</button>
+          </form>
+        </section>
+
+        <section class="set-group">
+          <h3 data-en="Data">Daten</h3>
+          <a class="btn ghost-btn set-export" id="set-export" href="/api/chat/export" download data-en="Download all my data">Alle meine Daten herunterladen</a>
+          <p class="set-hint" data-en="A file with your account, chats, memory and reminders (JSON).">Eine Datei mit deinem Konto, allen Chats, dem Gedächtnis und deinen Erinnerungen (JSON).</p>
+          <button type="button" class="btn ghost-btn" id="set-clear" data-en="Delete all chats">Alle Chats löschen</button>
+          <p class="set-hint" data-en="Battle votes stay in the leaderboard anonymously.">Abgestimmte Battles bleiben anonym in der Bestenliste.</p>
+        </section>
+
+        <section class="set-group">
+          <h3 data-en="About VAIs">Über VAIs</h3>
+          <button class="btn ghost-btn set-tour" id="set-news" type="button" data-en="What’s new?">Was ist neu?</button>
+          <button class="btn ghost-btn set-tour" id="set-tour" type="button" data-en="Show the welcome tour again">Willkommens-Tour noch mal ansehen</button>
+          <p class="set-hint legal-inline"><a href="/datenschutz" target="_blank" rel="noopener" data-en="Privacy policy">Datenschutzerklärung</a> · <a href="/impressum" target="_blank" rel="noopener" data-en="Legal notice">Impressum</a> · <a href="/status" target="_blank" rel="noopener">Status</a></p>
+        </section>
+
+        <section class="set-group danger">
+          <h3 data-en="Delete account">Konto löschen</h3>
+          <p class="set-hint" data-en="Deletes your account and all your chats permanently.">Löscht dein Konto und alle deine Chats endgültig.</p>
+          <form id="set-delete" class="set-form" novalidate>
+            <label class="sr-only" for="set-delete-pw" data-en="Password">Passwort</label>
+            <input class="input" id="set-delete-pw" type="password" autocomplete="current-password" placeholder="Passwort zur Bestätigung" data-en-placeholder="Password to confirm">
+            <p class="msg error" role="alert"></p>
+            <button class="btn danger-btn" type="submit" data-en="Delete account permanently">Konto endgültig löschen</button>
+          </form>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="team" id="team" hidden role="dialog" aria-modal="true" aria-labelledby="team-title">
+    <header class="team-head">
+      <button class="round-btn" id="team-back" type="button" hidden aria-label="Zurück" data-en-aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <div class="team-head-text"><h2 id="team-title" data-en="Team chat">Team-Chat</h2><small id="team-sub" data-en="Only for admins and mods">Nur für Admins und Mods</small></div>
+      <button class="round-btn" id="team-members-btn" type="button" hidden aria-label="Mitglieder" data-en-aria-label="Members"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3 3-5 6-5s5.4 2 6 5"/><path d="M19 8v6M16 11h6"/></svg></button>
+      <button class="round-btn" id="team-close" type="button" aria-label="Schließen" data-en-aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <section data-pane="list" class="team-pane">
+      <button type="button" class="btn team-new" id="team-new" data-en="+ New group">+ Neue Gruppe</button>
+      <ul class="team-list" id="team-list"></ul>
+    </section>
+    <section data-pane="create" class="team-pane" hidden>
+      <form id="team-create" class="team-create">
+        <label class="team-label" for="team-name" data-en="Name">Name</label>
+        <input class="input" id="team-name" maxlength="50" placeholder="z. B. VAIs-Team" data-en-placeholder="e.g. VAIs team">
+        <p class="team-label" data-en="Invite">Einladen</p>
+        <ul class="team-pick" id="team-pick"></ul>
+        <button class="btn" type="submit" data-en="Create group">Gruppe erstellen</button>
+      </form>
+    </section>
+    <section data-pane="chat" class="team-pane team-chat" hidden>
+      <ol class="team-msgs" id="team-msgs"></ol>
+      <p class="team-thinking" id="team-thinking" hidden><span class="gen-dots"></span> <span data-en="VAIs is writing …">VAIs schreibt …</span></p>
+      <form class="team-form" id="team-form">
+        <button type="button" class="team-ki" id="team-ki" title="KI erwähnen" data-en-title="Mention the AI">@KI</button>
+        <textarea class="input" id="team-input" rows="1" maxlength="4000" placeholder="Nachricht an die Gruppe …" data-en-placeholder="Message the group …"></textarea>
+        <button type="submit" class="tr-send" aria-label="Senden" data-en-aria-label="Send">→</button>
+      </form>
+    </section>
+    <section data-pane="members" class="team-pane" hidden><div id="team-members"></div></section>
+  </div>
+
+  <div class="tr" id="tr" hidden role="dialog" aria-modal="true" aria-labelledby="tr-title">
+    <div class="tr-head">
+      <h2 id="tr-title" data-en="Translator">Übersetzer</h2>
+      <button class="voice-close tr-close" id="tr-close" type="button" aria-label="Schließen" data-en-aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="tr-langs">
+      <select class="input" id="tr-a" aria-label="Sprache 1" data-en-aria-label="Language 1"></select>
+      <button type="button" class="tr-swap" id="tr-swap" aria-label="Tauschen" data-en-aria-label="Swap">⇄</button>
+      <select class="input" id="tr-b" aria-label="Sprache 2" data-en-aria-label="Language 2"></select>
+    </div>
+    <ol class="tr-log" id="tr-log"></ol>
+    <form class="tr-type" id="tr-type">
+      <input class="input" id="tr-input" autocomplete="off" placeholder="Oder hier tippen …" data-en-placeholder="Or type here …">
+      <button type="submit" class="tr-send" aria-label="Übersetzen" data-en-aria-label="Translate">→</button>
+    </form>
+    <div class="tr-mics">
+      <button type="button" class="tr-mic" id="tr-mic-a"><span class="tr-flag"></span><b></b><small data-en="tap and speak">tippen & sprechen</small></button>
+      <button type="button" class="tr-mic b" id="tr-mic-b"><span class="tr-flag"></span><b></b><small data-en="tap and speak">tippen & sprechen</small></button>
+    </div>
+  </div>
+
+  <div class="voice" id="voice" hidden role="dialog" aria-modal="true" aria-labelledby="voice-state">
+    <button class="voice-close" id="voice-close" type="button" aria-label="Beenden" data-en-aria-label="End">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+    <button type="button" class="voice-orb" id="voice-orb" aria-label="Fertig gesprochen" data-en-aria-label="Done speaking"><i></i><i></i><i></i></button>
+    <p class="voice-state" id="voice-state"></p>
+    <p class="voice-said" id="voice-said"></p>
+    <p class="voice-hint" id="voice-hint"></p>
+    <div class="voice-tools">
+      <button type="button" class="voice-route" id="voice-route" aria-pressed="false" hidden></button>
+      <button type="button" class="voice-route" id="voice-test" data-en="🔈 Test sound">🔈 Ton testen</button>
+    </div>
+    <p class="voice-ios" id="voice-ios" hidden data-en="Tip: For sound in voice mode, update your iPhone to iOS 17 or newer – or switch to speaker in Control Center.">Tipp: Für Ton im Sprach-Modus brauchst du iOS 17 oder neuer.</p>
+    <div class="voice-actions">
+      <button class="voice-act" id="voice-pause" type="button"></button>
+      <button class="voice-act end" id="voice-end" type="button" data-en="End">Beenden</button>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
