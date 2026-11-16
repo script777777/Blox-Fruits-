@@ -10,6 +10,8 @@ export type BypassSuccess = {
 export type BypassError = {
   ok: false;
   error: string;
+  /** Raw upstream / API message when available */
+  apiResponse?: string;
 };
 
 export type BypassResult = BypassSuccess | BypassError;
@@ -276,13 +278,16 @@ export async function runBypass(
     }
 
     if (!response.ok) {
+      const apiResponse = extractError(
+        payload,
+        `API error (${response.status})`,
+      );
       return {
         status: response.status === 401 || response.status === 429 ? response.status : 502,
         body: {
           ok: false,
-          error: humanizeUpstreamError(
-            extractError(payload, `API-Fehler (${response.status})`),
-          ),
+          error: humanizeUpstreamError(apiResponse),
+          apiResponse,
         },
       };
     }
@@ -292,13 +297,13 @@ export async function runBypass(
       typeof payload === "object" &&
       (payload as Record<string, unknown>).status === "failed"
     ) {
+      const apiResponse = extractError(payload, "Bypass failed");
       return {
         status: 502,
         body: {
           ok: false,
-          error: humanizeUpstreamError(
-            extractError(payload, "Bypass fehlgeschlagen"),
-          ),
+          error: humanizeUpstreamError(apiResponse),
+          apiResponse,
         },
       };
     }
@@ -308,11 +313,14 @@ export async function runBypass(
       (isHttpUrl(text.trim()) ? text.trim() : null);
 
     if (!destination) {
+      const apiResponse =
+        text.trim().slice(0, 500) || "API response contained no destination URL.";
       return {
         status: 502,
         body: {
           ok: false,
           error: "Antwort der API enthielt keine Ziel-URL.",
+          apiResponse,
         },
       };
     }

@@ -10,7 +10,7 @@ type BypassResponse =
       demo?: boolean;
       durationMs?: number;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; apiResponse?: string };
 
 type Phase = "idle" | "loading" | "success" | "error";
 type View = "home" | "contact" | "bot" | "pricing" | "docs";
@@ -135,6 +135,7 @@ function App() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [destination, setDestination] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [apiResponse, setApiResponse] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [durationMs, setDurationMs] = useState<number | undefined>();
@@ -216,6 +217,7 @@ function App() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setApiResponse(null);
     setDestination(null);
     setDemo(false);
     setCopied(false);
@@ -243,6 +245,7 @@ function App() {
         if (!first.ok) {
           setPhase("error");
           setError(first.error);
+          setApiResponse(first.apiResponse || first.error);
           return;
         }
         setDestination(first.destination);
@@ -256,15 +259,17 @@ function App() {
       if (!data.ok) {
         setPhase("error");
         setError(data.error);
+        setApiResponse(data.apiResponse || data.error);
         return;
       }
       setDestination(data.destination);
       setDemo(Boolean(data.demo));
       setDurationMs(data.durationMs);
       setPhase("success");
-    } catch {
+    } catch (err) {
       setPhase("error");
       setError("Network error — please try again.");
+      setApiResponse(err instanceof Error ? err.message : "Network request failed");
     }
   }
 
@@ -294,6 +299,7 @@ function App() {
     setPhase("idle");
     setDestination(null);
     setError(null);
+    setApiResponse(null);
     setDemo(false);
   }
 
@@ -624,7 +630,22 @@ function App() {
                         </button>
                       </>
                     )}
-                    {error ? <p className="error">{error}</p> : null}
+                    {error ? (
+                      <div className="error-box" role="alert">
+                        <div className="error-box-head">
+                          <span className="error-box-icon" aria-hidden="true">
+                            !
+                          </span>
+                          <strong>Error</strong>
+                        </div>
+                        <p className="error-box-msg">
+                          {apiResponse || error}
+                        </p>
+                        {apiResponse && apiResponse !== error ? (
+                          <p className="error-box-hint">{error}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </form>
 
                   <div className="popular">
